@@ -9,6 +9,16 @@
 
 需要先安装 **Forge 1.5.1** 前置：[https://github.com/Lawrence-al/forge](https://github.com/Lawrence-al/forge)
 
+### 数据说明
+
+- 插件主要检测本地玩家的伤害，自己的数据最准确；
+- 作为客机加入时，其他玩家的伤害依赖网络同步，可能出现延迟、缺失或数值不准确；
+- 请不要把客机端显示的其他玩家数据当作精确结算依据。
+
+### 使用提醒
+
+DPS 统计可能让部分玩家感到压力或不适。联机时请尊重队友，不要用数据指责、嘲讽或强迫他人；和路人游玩时，建议先询问对方是否介意，或暂时关闭面板。
+
 ### 安装
 
 1. 安装 Forge 1.5.1 前置；
@@ -106,6 +116,16 @@ dps_show_weapon = true
 A Forge DPS overlay for **Monster Hunter Generations Ultimate (MHGU) 1.4.0**. It shows the whole-party cumulative damage chart, total damage, DPS, and percentage for up to four players.
 
 Requires **Forge 1.5.1**: [https://github.com/Lawrence-al/forge](https://github.com/Lawrence-al/forge)
+
+### Data accuracy
+
+- The meter primarily tracks local damage; your own values are the most accurate.
+- When joining as a guest, other players' damage depends on network synchronization and may be delayed, incomplete, or inaccurate.
+- Do not treat guest-side values for other players as exact results.
+
+### Fair play
+
+DPS meters can make some players uncomfortable. Please respect your teammates and do not use the data to blame, mock, or pressure others. When playing with random players, consider asking first or turning the panel off.
 
 ### Installation
 
