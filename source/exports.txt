@@ -1,0 +1,9 @@
+# 构建校验必须在 ELF 动态符号表找到的入口；由 Rust 自动导出。
+init
+fini
+forge_onLoad
+forge_onInit
+forge_onUpdate
+forge_onImGuiInit
+forge_onImGuiRender
+forge_onImGuiFreeRender
