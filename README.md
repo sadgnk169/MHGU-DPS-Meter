@@ -2,7 +2,7 @@
 
 [中文](README.md) | [English](README.en.md)
 
-《怪物猎人 XX / Generations Ultimate》的 Forge DPS 面板插件，显示队伍四名玩家的整场累计伤害、总伤害、秒伤、百分比和累计伤害曲线。
+《怪物猎人 GU》（Monster Hunter Generations Ultimate）1.4.0 的 Forge DPS 面板插件，显示队伍四名玩家的整场累计伤害、总伤害、秒伤、百分比和累计伤害曲线。
 
 - 前置：需要 **Forge 1.5.1**：[https://github.com/Lawrence-al/forge](https://github.com/Lawrence-al/forge)
 - NRO：`00_mhgu_dps_meter.nro`

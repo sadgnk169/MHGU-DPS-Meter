@@ -2,7 +2,7 @@
 
 [English](README.en.md) | [中文](README.md)
 
-A Forge DPS overlay for **Monster Hunter Generations Ultimate** (MHGU). It shows the whole-party cumulative damage chart, total damage, DPS, percentage, and a team summary for up to four players.
+A Forge DPS overlay for **Monster Hunter Generations Ultimate (MHGU) 1.4.0**. It shows the whole-party cumulative damage chart, total damage, DPS, percentage, and a team summary for up to four players.
 
 - Prerequisite: **Forge 1.5.1** — [https://github.com/Lawrence-al/forge](https://github.com/Lawrence-al/forge)
 - NRO: `00_mhgu_dps_meter.nro`
