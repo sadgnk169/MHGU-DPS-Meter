@@ -2,6 +2,8 @@
 
 [中文](#zh) | [English](#en)
 
+![MHGU DPS Meter](docs/demo.jpg)
+
 <a id="zh"></a>
 ## 中文
 
