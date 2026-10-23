@@ -616,7 +616,7 @@ fn main() {
         unsafe { install_hooks(base) };
         INSTALLED.store(true, Ordering::Release);
         ENABLED.store(config.enabled, Ordering::Relaxed);
-        info!("mhgu-dps-meter v0.1: DPS meter, main=0x{base:08X}");
+        info!("mhgu-dps-meter v{}: DPS meter, main=0x{base:08X}", env!("CARGO_PKG_VERSION"));
     }
 }
 
