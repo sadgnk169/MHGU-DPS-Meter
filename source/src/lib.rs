@@ -233,7 +233,6 @@ struct OwnerDps {
     slot: u8,
     color: u8,
     weapon: u8,
-    palico_type: u32,
     name: PlayerName,
 }
 impl OwnerDps {
@@ -245,7 +244,6 @@ impl OwnerDps {
         slot: 0xFF,
         color: 0xFF,
         weapon: 0xFF,
-        palico_type: 0xFFFF_FFFF,
         name: PlayerName::EMPTY,
     };
 }
@@ -364,7 +362,6 @@ impl DpsState {
                     slot: player_slot,
                     color: owner_color(owner, player_slot),
                     weapon: owner_weapon(owner),
-                    palico_type: owner_palico_type(owner),
                     name: unsafe { owner_name(GAME_BASE.load(Ordering::Relaxed), owner) },
                 };
                 self.count += 1;
@@ -387,10 +384,6 @@ impl DpsState {
         let weapon = owner_weapon(owner);
         if weapon != 0xFF {
             row.weapon = weapon;
-        }
-        let palico_type = owner_palico_type(owner);
-        if palico_type != 0xFFFF_FFFF {
-            row.palico_type = palico_type;
         }
         let name = unsafe { owner_name(GAME_BASE.load(Ordering::Relaxed), owner) };
         if !name.is_empty() {
@@ -484,13 +477,6 @@ fn owner_weapon(owner: u32) -> u8 {
     }
 }
 
-fn owner_palico_type(owner: u32) -> u32 {
-    if owner < 0x10000 {
-        return 0xFFFF_FFFF;
-    }
-    unsafe { read_u32(owner + 0x1380) }
-}
-
 unsafe fn owner_name(base: u32, owner: u32) -> PlayerName {
     if owner < 0x10000 || base < 0x10000 {
         return PlayerName::EMPTY;
@@ -530,28 +516,13 @@ unsafe fn owner_name(base: u32, owner: u32) -> PlayerName {
     local_fallback
 }
 
-fn palico_icon(palico_type: u32) -> Option<usize> {
-    match palico_type {
-        0xAB => Some(16),
-        0x88 => Some(17),
-        0x6C => Some(18),
-        0xBB => Some(19),
-        0x80 => Some(20),
-        0x68 => Some(21),
-        0xD4 => Some(22),
-        0x26 => Some(23),
-        _ => None,
-    }
-}
-
 fn row_icon(row: &OwnerDps) -> usize {
     if row.weapon == 15 {
-        palico_icon(row.palico_type).unwrap_or(15)
+        PALICO_ICON
     } else if row.weapon < 15 {
         row.weapon as usize
     } else {
-        // 猎猫模式偶尔读不到武器类型；palico_type 已知时仍显示对应猫图标。
-        palico_icon(row.palico_type).unwrap_or(0xFF)
+        0xFF
     }
 }
 
@@ -585,6 +556,9 @@ fn row_color(row: &OwnerDps, index: usize) -> usize {
 
 static DPS: Shared<DpsState> = Shared::new(DpsState::new());
 const DPS_FONT_SIZE: f32 = 19.0;
+// 猎猫图标槽比武器图标低 2px；按 20x20 图标槽整体上移对齐。
+const PALICO_ICON: usize = 15;
+const PALICO_ICON_LIFT: f32 = 2.0;
 static FRAME: AtomicU32 = AtomicU32::new(0);
 
 #[unsafe(no_mangle)]
@@ -1308,6 +1282,11 @@ fn draw_dps_curve(dps: &DpsState, config: &Config, display: DisplayArea) {
             if icon_index != 0xFF {
                 let icon = &icons::ICONS[icon_index];
                 if icon.width != 0 && icon.height != 0 {
+                    let icon_bottom = if icon_index >= PALICO_ICON {
+                        icon_bottom - PALICO_ICON_LIFT * scale
+                    } else {
+                        icon_bottom
+                    };
                     draw_pixel_icon(
                         &draw,
                         icon,
