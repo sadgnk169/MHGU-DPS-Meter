@@ -1,5 +1,6 @@
 source/target/
 source/dist/
 *.log
+!research/data/palico-v10.log
 *.tmp
 .DS_Store

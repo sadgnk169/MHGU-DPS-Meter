@@ -5,7 +5,7 @@
 ## 构建环境
 
 - Rust nightly（需要 `rust-src`，见 `rust-toolchain.toml`）
-- devkitPro（devkitARM，供 ARM 链接器使用）
+- devkitPro/switch-tools：`build.sh` 会设置 devkitARM 链接器路径并调用 `cargo-forge` 打包 NRO；如果只运行 `cargo forge build`，链接器按 target spec 使用 `rust-lld`
 - 网络访问：`build.sh` 会从固定 Forge 修订版安装 `cargo-mhgu-forge`
 - Windows 可用 Git Bash 运行；`build.ps1` 是 PowerShell 包装
 
@@ -38,3 +38,9 @@ mhgu-forge = { git = "https://github.com/Lawrence-al/forge-rs", rev = "f2af0622a
 - `shared/plugin_config.rs`：INI 读写、Forge 菜单辅助
 - `conf/mhgu_dps_meter.ini`：编译时嵌入的默认配置
 - `link/`、`.cargo/`、`armv7a-none-eabi.json`：Switch ARM 链接配置
+
+## Research / 研究资料
+
+中文和英文研究笔记、原始诊断日志和 NRO 检查工具见 [../research/README.md](../research/README.md)。
+
+Chinese and English notes, the raw diagnostic log, and the NRO checker are in [../research/README.md](../research/README.md).

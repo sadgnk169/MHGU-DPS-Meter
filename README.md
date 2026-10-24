@@ -13,8 +13,8 @@
 
 ### 数据说明
 
-- 插件主要检测本地玩家的伤害，自己的数据最准确；
-- 作为客机加入时，其他玩家的伤害依赖网络同步，可能出现延迟、缺失或数值不准确；
+- 插件统计本机游戏能够处理到的命中，自己的伤害最准确；
+- 主机端通常能看到较完整的队伍伤害；作为客机加入时，其他玩家的伤害更依赖网络同步，可能出现延迟、缺失或数值不准确；
 - 请不要把客机端显示的其他玩家数据当作精确结算依据。
 
 ### 使用提醒
@@ -35,9 +35,9 @@ DPS 统计可能让部分玩家感到压力或不适。联机时请尊重队友�
 ### 使用
 
 - 面板默认显示在画面左侧、玩家名字下方；
-- 默认行标签为 `You / P1 / P2 / P3 / P4`；
+- 默认行标签为 `You / P1 / P2 / P3 / P4`；这些是 slot 标签，不代表队伍顺序或主机顺序；
 - 行按伤害从高到低排列；
-- 换区会保留累计数据；结算或保存画面出现约 2 秒后自动清零；
+- 换区会保留 DPS 累计，只会清理旧的浮动伤害数字；结算或保存画面出现约 60 帧（视帧率约 1–2 秒）后自动清零；
 - 单人任务也会显示；两名及以上玩家时显示底部全队统计；
 - 关闭统计：在 Forge 菜单取消 `Enable DPS meter`，或把 INI 的 `enabled` 改为 `false`；
 - 重置本轮数据：使用 Forge 菜单中的 `Reset DPS`。
@@ -112,6 +112,10 @@ dps_show_percent_bar = true
 dps_show_weapon = true
 ```
 
+### 开发资料
+
+内存偏移、Hook 流程、猎猫类型调查的失败实验、NRO 重定位检查和原始诊断日志都在 [research/](research/README.md)，供维护者和想用 Forge 做类似插件的人参考。
+
 <a id="en"></a>
 ## English
 
@@ -121,8 +125,8 @@ Requires **Forge 1.5.1**: [https://github.com/Lawrence-al/forge](https://github.
 
 ### Data accuracy
 
-- The meter primarily tracks local damage; your own values are the most accurate.
-- When joining as a guest, other players' damage depends on network synchronization and may be delayed, incomplete, or inaccurate.
+- The meter counts hits the local game can process; your own values are the most accurate.
+- The host usually sees more complete party damage. When joining as a guest, other players' damage depends more on network synchronization and may be delayed, incomplete, or inaccurate.
 - Do not treat guest-side values for other players as exact results.
 
 ### Fair play
@@ -143,9 +147,9 @@ DPS meters can make some players uncomfortable. Please respect your teammates an
 ### Usage
 
 - The panel appears on the left, below the player/party names.
-- Default labels are `You / P1 / P2 / P3 / P4`.
+- Default labels are `You / P1 / P2 / P3 / P4`. These are slot labels, not party order or host order.
 - Rows are sorted by damage, highest first.
-- Area changes keep the accumulated data; data clears about two seconds after the save/result screen appears.
+- Area changes keep DPS totals; only old floating damage numbers are cleared. Data clears about 60 frames (roughly 1–2 seconds depending on frame rate) after the save/result screen appears.
 - Single-player quests are supported; the team summary appears with two or more players.
 - To disable the overlay, turn off `Enable DPS meter` or set `enabled = false` in the INI.
 - To reset the current run, use `Reset DPS` in the Forge menu.
@@ -177,3 +181,7 @@ After editing the INI manually, fully restart the game. Menu changes preview imm
 | `dps_curve_fill` | `true` | Fill below the chart |
 | `dps_show_percent_bar` | `true` | Show percentage bars |
 | `dps_show_weapon` | `true` | Show weapon icons |
+
+### Development notes
+
+Memory offsets, hook flow, the failed Palico-type investigation, NRO relocation checks, and the raw diagnostic log are in [research/](research/README.md), for maintainers and anyone building similar Forge plugins.
