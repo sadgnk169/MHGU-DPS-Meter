@@ -25,7 +25,7 @@ DPS 统计可能让部分玩家感到压力或不适。联机时请尊重队友�
 
 本版只有一个 NRO：`mhgu_dps_meter.nro`，已分别测试兼容：
 
-- [FF14-style Damage Text v0.1.1](https://gamebanana.com/mods/727751)
+- [FF14-style Damage Text v011](https://gamebanana.com/mods/727751)
 - [Damage Numbers r30](https://gamebanana.com/mods/725408)
 - [MHGU Attack Damage Display](https://github.com/Lawrence-al/mhgu-attack-damage-display)
 - 单独使用
@@ -146,7 +146,7 @@ DPS meters can make some players uncomfortable. Please respect your teammates an
 
 This release has a single NRO, `mhgu_dps_meter.nro`, tested with:
 
-- [FF14-style Damage Text v0.1.1](https://gamebanana.com/mods/727751)
+- [FF14-style Damage Text v011](https://gamebanana.com/mods/727751)
 - [Damage Numbers r30](https://gamebanana.com/mods/725408)
 - [MHGU Attack Damage Display](https://github.com/Lawrence-al/mhgu-attack-damage-display)
 - Standalone use
