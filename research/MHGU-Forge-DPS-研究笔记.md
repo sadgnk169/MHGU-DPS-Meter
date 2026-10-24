@@ -8,13 +8,14 @@
 
 ## 1. 结论摘要
 
-- 插件是 Forge NRO，放在 `romfs/nativeNX/plugins/00_mhgu_dps_meter.nro`。
+- 插件是 Forge NRO，放在 `romfs/nativeNX/plugins/`。
 - 通过两个游戏函数 Hook 采集命中：碰撞函数和伤害函数。
 - 插件统计本机游戏能够处理到的命中；自己的伤害最准确。队友伤害能否完整出现取决于本机是否处理到该次命中，客机端更依赖同步。
 - 玩家管理器和玩家对象的偏移在本文第 3 节。
 - `player + 0x1380` **不是猎猫类型**，也不是一个稳定的类型值；它可能是每只猫的实例、外观、语音或其他 ID，具体语义尚未确认。1.1.0 已取消类型检测，所有猎猫统一使用 15 号图标。
 - 图标源多数为 20×20 RGBA，旧野兽图是 22×22；当前统一图标是 20×20。绘制时按 2×2 源像素合并，720p 通常每个逻辑格 2px，1080p 通常为 3px。
 - 实测猎猫图标视觉上比武器图标低约 2px；1.1.0 用 `PALICO_ICON_LIFT = 2.0` 对猎猫图标槽整体上移。这是经验修正，不是已确认的引擎槽位规则。
+- 1.2.0 只有一个通用 NRO `mhgu_dps_meter.nro`，已分别测试兼容 FF14-style Damage Text v0.1.1、Damage Numbers r30、MHGU Attack Damage Display 和单独使用。
 - 生成的 NRO 必须检查动态重定位不能写入只读段。本项目的 NRO 没有 `TEXTREL`。
 
 ## 2. 构建与验证
@@ -40,13 +41,13 @@ bash build.sh
 
 ### 2.2 本地离线构建
 
-发布源码的 `Cargo.toml` 使用 GitHub 上的 Forge。网络受限时，可以把依赖临时改成工作区里的本地 Forge：
+发布源码的 `Cargo.toml` 使用 GitHub 上的 Forge。网络受限时，可以把依赖临时指向本地 Forge 源码目录（路径按自己的目录替换）：
 
 ```toml
 mhgu-forge = { path = "<本地 Forge 源码目录>/forge", default-features = false, features = ["imgui", "mt"] }
 ```
 
-构建完成后恢复为 git 依赖，不要把这个本地路径提交到发布仓库。
+本地路径仅用于本机构建。
 
 ### 2.3 NRO 重定位检查
 
@@ -217,13 +218,13 @@ let icon_bottom = icon_bottom - PALICO_ICON_LIFT * scale;
 发布包只包含运行所需文件：
 
 ```text
-MHGU-DPS-Meter-v1.1.0/
+MHGU-DPS-Meter-v1.2.0.zip
   README.md
   conf/mhgu_dps_meter.ini
   docs/demo.jpg
   romfs/nativeNX/forge/fonts/NotoSansSC-Medium.otf
   romfs/nativeNX/forge/fonts/OFL.txt
-  romfs/nativeNX/plugins/00_mhgu_dps_meter.nro
+  romfs/nativeNX/plugins/mhgu_dps_meter.nro
 ```
 
 发布前检查：
@@ -232,7 +233,8 @@ MHGU-DPS-Meter-v1.1.0/
 2. NRO `verify_nro.py` 没有只读段重定位；
 3. NRO 启动字符串版本与 `Cargo.toml` 一致；
 4. INI 头部版本一致；
-5. ZIP 内 NRO SHA256 与 `成品` 目录一致。
+5. NRO 的 SHA256 与 `成品` 目录一致；
+6. NRO 跑一次 `verify_nro.py`。
 
 ## 9. 已知限制
 
@@ -241,3 +243,46 @@ MHGU-DPS-Meter-v1.1.0/
 - 猎猫类型不自动识别；所有猎猫使用统一图标。
 - 武器类型读取失败时（返回 `0xFF`）不显示图标，避免把猎人误判成猎猫。
 - 没有在线上随机匹配中验证；正式测试应使用本地无线或可信队伍。
+
+
+## 10. 伤害显示模组兼容性
+
+### 10.1 Hook 路径
+
+| 插件 | 主要 Hook/补丁地址 |
+| --- | --- |
+| DPS 通用版 | `0x0009D6F8`、`0x00170968` |
+| [Damage Numbers r30](https://gamebanana.com/mods/725408) | `0x0009D6F8`、`0x00170968`、`0x00276278` |
+| [MHGU Attack Damage Display](https://github.com/Lawrence-al/mhgu-attack-damage-display) | `0x0009D6F8`、`0x00170968` |
+| [FF14-style Damage Text v0.1.1](https://gamebanana.com/mods/727751) | 不使用上述入口，走另一条显示路径 |
+
+DPS、Damage Numbers 和 Attack Damage Display 使用同一组命中入口；FF14 显伤使用另一条路径。
+
+### 10.2 如何兼容
+
+通用版 `mhgu_dps_meter.nro` 做了两件事：
+
+1. Hook 安装延迟到第一次 `forge_onUpdate`，此时所有插件的 `forge_onInit` 已执行完，Damage Numbers / Attack Damage Display 已先安装；
+2. `compatible()` 允许 `0x170968`、`0x9D6F8`、`0x276278` 已被其他模组修改的入口继续安装。
+
+Forge 的 `forge_hook_create` 会把当前入口复制到跳板，因此形成：
+
+```text
+目标入口 -> DPS detour -> 其他显伤 detour -> 游戏原函数
+```
+
+两个 detour 都会调用自己的 original，所以两边都能工作。文件名前缀和加载顺序不再是兼容条件。通用版已分别实测可与 Damage Numbers r30、Attack Damage Display 和 FF14-style Damage Text 共存。
+
+通用版对这三个入口采用“允许已被修改”的策略；更换游戏版本后必须重新验证。
+
+### 10.3 使用与冲突排查
+
+- 只安装一个 DPS NRO：`mhgu_dps_meter.nro`。
+- FF14-style Damage Text 可以和 Damage Numbers 或 Attack Damage Display 同时存在。
+- Damage Numbers 和 Attack Damage Display 彼此占用同一入口，**不能同时启用**；DPS 无法替它们解决互相冲突。
+- 不要同时保留旧版本或其他 DPS NRO。
+- 如果 DPS 不计数或伤害显示无效果，检查 Forge 日志：
+  - `invalid or overlapping hook recipe` / `Forge hook installation failed`：可能还装着另一个 DPS NRO，或同时启用了 Damage Numbers 和 Attack Damage Display。
+  - `already patched ... chaining`：正常日志，说明 DPS 接在已有 Hook 后面。
+  - `hooks skipped` / `hook installation failed`：签名校验失败，检查游戏版本和 NRO。
+- 如果崩溃或数字异常，删除 NRO 并恢复旧版本；不要继续在随机联机中测试。

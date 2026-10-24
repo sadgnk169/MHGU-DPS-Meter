@@ -8,13 +8,14 @@ This document records only the reverse-engineering facts used by this project, t
 
 ## 1. Summary
 
-- The plugin is a Forge NRO placed at `romfs/nativeNX/plugins/00_mhgu_dps_meter.nro`.
+- The plugin is a Forge NRO placed under `romfs/nativeNX/plugins/`.
 - Damage is collected with two game-function hooks: the collision function and the damage function.
 - The plugin counts hits that the local game can process. Local-player damage is the most reliable; whether teammate damage appears depends on whether the local game processes that hit, and guest-side data depends more on synchronization.
 - Player manager and player-object offsets are listed in section 3.
 - `player + 0x1380` is **not** a Palico type, and it is not a stable type value either. It may be a per-Palico instance, appearance, voice, or other ID; the exact semantics are unconfirmed. Version 1.1.0 removed type detection and uses icon index 15 for every Palico.
 - Most icon sources are 20×20 RGBA; the old Beast icon is 22×22. The current unified Palico icon is 20×20. Rendering merges each 2×2 source block into one logical cell: normally 2 px per cell at 720p and 3 px at 1080p.
 - Palico icons appear about 2 px lower than weapon icons in practice. Version 1.1.0 compensates with `PALICO_ICON_LIFT = 2.0`. This is an empirical correction, not a confirmed engine-level slot rule.
+- Version 1.2.0 ships one universal NRO, `mhgu_dps_meter.nro`, tested with FF14-style Damage Text v0.1.1, Damage Numbers r30, MHGU Attack Damage Display, and standalone use.
 - Every generated NRO must be checked so that no dynamic relocation writes into a read-only segment. This project's NRO has no `TEXTREL`.
 
 ## 2. Build and Verification
@@ -40,13 +41,13 @@ bash build.sh
 
 ### 2.2 Offline local build
 
-The release source depends on Forge from GitHub. When the network is unavailable, temporarily point the dependency at the local Forge checkout in this workspace:
+The release source depends on Forge from GitHub. When the network is unavailable, temporarily point the dependency at a local Forge checkout (replace the placeholder with your own path):
 
 ```toml
 mhgu-forge = { path = "<path-to-local-forge>/forge", default-features = false, features = ["imgui", "mt"] }
 ```
 
-Restore the git dependency after building. Do not commit the local path to the release repository.
+The local path is for local builds only.
 
 ### 2.3 NRO relocation check
 
@@ -217,13 +218,13 @@ The raw v10 diagnostic log is `research/data/palico-v10.log`. It contains eleven
 A release contains only runtime files:
 
 ```text
-MHGU-DPS-Meter-v1.1.0/
+MHGU-DPS-Meter-v1.2.0.zip
   README.md
   conf/mhgu_dps_meter.ini
   docs/demo.jpg
   romfs/nativeNX/forge/fonts/NotoSansSC-Medium.otf
   romfs/nativeNX/forge/fonts/OFL.txt
-  romfs/nativeNX/plugins/00_mhgu_dps_meter.nro
+  romfs/nativeNX/plugins/mhgu_dps_meter.nro
 ```
 
 Pre-release checklist:
@@ -232,7 +233,8 @@ Pre-release checklist:
 2. `verify_nro.py` reports no relocation into read-only segments;
 3. the version string inside the NRO matches `Cargo.toml`;
 4. the INI header version matches;
-5. the ZIP NRO SHA256 matches the `成品` directory.
+5. the NRO SHA256 matches the `成品` directory;
+6. run `verify_nro.py` on the NRO.
 
 ## 9. Known Limitations
 
@@ -241,3 +243,46 @@ Pre-release checklist:
 - Palico type is not detected automatically; every Palico uses the same icon.
 - If the weapon type cannot be read (`0xFF`), no icon is shown, avoiding a false Prowler classification.
 - Online random-match testing has not been performed. Use local wireless or a trusted party for verification.
+
+
+## 10. Damage Display Mod Compatibility
+
+### 10.1 Hook path
+
+| Plugin | Main hook/patch addresses |
+| --- | --- |
+| DPS universal build | `0x0009D6F8`, `0x00170968` |
+| [Damage Numbers r30](https://gamebanana.com/mods/725408) | `0x0009D6F8`, `0x00170968`, `0x00276278` |
+| [MHGU Attack Damage Display](https://github.com/Lawrence-al/mhgu-attack-damage-display) | `0x0009D6F8`, `0x00170968` |
+| [FF14-style Damage Text v0.1.1](https://gamebanana.com/mods/727751) | Does not use these entries; different display path |
+
+DPS, Damage Numbers, and Attack Damage Display share the same hit entries; FF14-style Damage Text uses a different path.
+
+### 10.2 How to coexist
+
+The universal `mhgu_dps_meter.nro`:
+
+1. Delays hook installation until the first `forge_onUpdate`, after every plugin's `forge_onInit`, so Damage Numbers / Attack Damage Display install first;
+2. Accepts `0x170968`, `0x9D6F8`, and `0x276278` when another mod has already modified them.
+
+Forge's `forge_hook_create` copies the current entry into a trampoline:
+
+```text
+target entry -> DPS detour -> other display mod detour -> original game function
+```
+
+Both detours call their own original, so both keep working. Filename prefixes and load order are no longer compatibility requirements. The universal build has been tested separately with Damage Numbers r30, Attack Damage Display, and FF14-style Damage Text.
+
+The universal build accepts already-modified entries at those three addresses. Re-verify after a game update.
+
+### 10.3 Usage and conflict checks
+
+- Install only one DPS NRO: `mhgu_dps_meter.nro`.
+- FF14-style Damage Text can coexist with either Damage Numbers or Attack Damage Display.
+- Damage Numbers and Attack Damage Display use the same entry and **cannot be enabled together**; DPS cannot resolve their mutual conflict.
+- Do not keep an older DPS NRO or another copy installed.
+- If DPS does not count or the display mod has no effect, check the Forge log:
+  - `invalid or overlapping hook recipe` / `Forge hook installation failed`: another DPS NRO may still be installed, or Damage Numbers and Attack Damage Display are both enabled.
+  - `already patched ... chaining`: expected; DPS is attaching behind an existing hook.
+  - `hooks skipped` / `hook installation failed`: signature check failed; verify the game version and NRO.
+- If it crashes or renders incorrect numbers, remove the NRO and restore the previous version. Do not continue testing in random online multiplayer.

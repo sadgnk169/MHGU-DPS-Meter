@@ -21,11 +21,20 @@
 
 DPS 统计可能让部分玩家感到压力或不适。联机时请尊重队友，不要用数据指责、嘲讽或强迫他人；和路人游玩时，建议先询问对方是否介意，或暂时关闭面板。
 
+### 兼容的伤害显示
+
+本版只有一个 NRO：`mhgu_dps_meter.nro`，已分别测试兼容：
+
+- [FF14-style Damage Text v0.1.1](https://gamebanana.com/mods/727751)
+- [Damage Numbers r30](https://gamebanana.com/mods/725408)
+- [MHGU Attack Damage Display](https://github.com/Lawrence-al/mhgu-attack-damage-display)
+- 单独使用
+
 ### 安装
 
 1. 安装 Forge 1.5.1 前置；
 2. 把 `romfs` 目录放到 MHGU 的 mod 目录，确保包含：
-   - `romfs/nativeNX/plugins/00_mhgu_dps_meter.nro`
+   - `romfs/nativeNX/plugins/mhgu_dps_meter.nro`
    - `romfs/nativeNX/forge/fonts/NotoSansSC-Medium.otf`
    - `romfs/nativeNX/forge/fonts/OFL.txt`
 3. 把 `conf/mhgu_dps_meter.ini` 放到 MHGU 当前用户的存档根目录，或首次运行时让插件自动生成；
@@ -133,11 +142,20 @@ Requires **Forge 1.5.1**: [https://github.com/Lawrence-al/forge](https://github.
 
 DPS meters can make some players uncomfortable. Please respect your teammates and do not use the data to blame, mock, or pressure others. When playing with random players, consider asking first or turning the panel off.
 
+### Damage display compatibility
+
+This release has a single NRO, `mhgu_dps_meter.nro`, tested with:
+
+- [FF14-style Damage Text v0.1.1](https://gamebanana.com/mods/727751)
+- [Damage Numbers r30](https://gamebanana.com/mods/725408)
+- [MHGU Attack Damage Display](https://github.com/Lawrence-al/mhgu-attack-damage-display)
+- Standalone use
+
 ### Installation
 
 1. Install the Forge 1.5.1 prerequisite.
 2. Copy the `romfs` directory into the MHGU mod directory, including:
-   - `romfs/nativeNX/plugins/00_mhgu_dps_meter.nro`
+   - `romfs/nativeNX/plugins/mhgu_dps_meter.nro`
    - `romfs/nativeNX/forge/fonts/NotoSansSC-Medium.otf`
    - `romfs/nativeNX/forge/fonts/OFL.txt`
 3. Copy `conf/mhgu_dps_meter.ini` to the MHGU save root, or let the plugin create it on first launch.

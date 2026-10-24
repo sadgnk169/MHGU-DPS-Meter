@@ -3,4 +3,5 @@ source/dist/
 *.log
 !research/data/palico-v10.log
 *.tmp
+__pycache__/
 .DS_Store

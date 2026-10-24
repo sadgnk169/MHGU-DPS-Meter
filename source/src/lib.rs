@@ -12,7 +12,7 @@ use core::{
     fmt::{self, Write},
     mem::{self, MaybeUninit},
     ptr,
-    sync::atomic::{AtomicU32, Ordering},
+    sync::atomic::{AtomicBool, AtomicU32, Ordering},
 };
 use data::*;
 use forge::{
@@ -560,6 +560,7 @@ const DPS_FONT_SIZE: f32 = 19.0;
 const PALICO_ICON: usize = 15;
 const PALICO_ICON_LIFT: f32 = 2.0;
 static FRAME: AtomicU32 = AtomicU32::new(0);
+static HOOK_ATTEMPTED: AtomicBool = AtomicBool::new(false);
 
 #[unsafe(no_mangle)]
 pub extern "C" fn forge_onLoad(params: *mut forge::sys::init::PluginInitParams) {
@@ -582,16 +583,16 @@ pub extern "C" fn forge_onInit() {
 fn main() {
     let base = forge::mem::text_addr();
     GAME_BASE.store(base, Ordering::Relaxed);
-    if compatible(base) {
-        let config = load_config();
-        MENU.with(|edit| *edit = plugin_config::Edit::new(config));
-        set_font_input(config);
-        STATE.with(|state| state.config = config);
-        unsafe { install_hooks(base) };
-        INSTALLED.store(true, Ordering::Release);
-        ENABLED.store(config.enabled, Ordering::Relaxed);
-        info!("mhgu-dps-meter v{}: DPS meter, main=0x{base:08X}", env!("CARGO_PKG_VERSION"));
-    }
+    let config = load_config();
+    MENU.with(|edit| *edit = plugin_config::Edit::new(config));
+    set_font_input(config);
+    STATE.with(|state| state.config = config);
+    ENABLED.store(config.enabled, Ordering::Relaxed);
+    // Install after all plugins' forge_onInit so Damage Numbers can install first.
+    info!(
+        "mhgu-dps-meter v{}: hooks deferred, main=0x{base:08X}",
+        env!("CARGO_PKG_VERSION")
+    );
 }
 
 fn load_config() -> Config {
@@ -647,6 +648,15 @@ pub extern "C" fn forge_onUpdate(dt: f32) {
     let base = GAME_BASE.load(Ordering::Relaxed);
     FRAME.fetch_add(1, Ordering::Relaxed);
     let dt = if dt.is_finite() && dt > 0.0 { dt } else { 1.0 / 60.0 };
+    if !INSTALLED.load(Ordering::Acquire) && !HOOK_ATTEMPTED.swap(true, Ordering::AcqRel) {
+        if compatible(base) {
+            unsafe { install_hooks(base) };
+            INSTALLED.store(true, Ordering::Release);
+            info!("mhgu-dps-meter: chained hooks installed after first update");
+        } else {
+            error!("mhgu-dps-meter: hook installation failed");
+        }
+    }
     if DEBUG_LOG_ENABLED {
         DEBUG_LOG.with(|log| {
             log.tick(dt);
@@ -1584,6 +1594,14 @@ fn draw_settings() {
 }
 
 fn draw_settings_body() {
+    imgui::text_wrapped(c"Compatibility / 兼容:");
+    imgui::text_wrapped(c"FF14-style Damage Text v0.1.1");
+    imgui::text_wrapped(c"Damage Numbers r30");
+    imgui::text_wrapped(c"MHGU Attack Damage Display (tested)");
+    imgui::text_wrapped(c"本版本支持以上三款已测试组合。");
+    imgui::text_wrapped(c"Only one DPS NRO. Damage Numbers and Attack Display cannot be enabled together.");
+    imgui::text_wrapped(c"只安装一个 DPS NRO；Damage Numbers 与 Attack Display 不能同时启用。");
+    imgui::separator();
     if !INSTALLED.load(Ordering::Acquire) {
         imgui::text("Hook addresses did not match. See Forge log.");
         return;
@@ -1799,6 +1817,17 @@ fn compatible(base: u32) -> bool {
     ] {
         let actual = unsafe { read_u32(base + offset) };
         if actual != expected {
+            // Damage Numbers patches these entry points before this plugin
+            // installs. Hook on top of them.
+            if matches!(
+                offset,
+                0x00170968 | 0x0017096C | 0x0009D6F8 | 0x0009D6FC | 0x00276278 | 0x0027627C
+            ) {
+                warn!(
+                    "mhgu-dps-meter: main+0x{offset:08X} already patched (0x{actual:08X}); chaining"
+                );
+                continue;
+            }
             error!(
                 "mhgu-dps-meter: main+0x{offset:08X}=0x{actual:08X}, expected 0x{expected:08X}; hooks skipped"
             );

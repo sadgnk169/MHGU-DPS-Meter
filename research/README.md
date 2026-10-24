@@ -1,8 +1,12 @@
 # Research / 研究资料
 
-这里放 MHGU DPS Meter 的逆向记录、失败实验和可复用工具，面向维护者，以及想用 Forge 做类似 MHGU 插件的人。
+这里放 MHGU DPS Meter 的逆向记录、失败实验、伤害显示模组兼容说明和可复用工具，面向维护者，以及想用 Forge 做类似 MHGU 插件的人。
 
-This folder contains reverse-engineering notes, failed experiments, and reusable tools for maintainers and for anyone building similar MHGU plugins with Forge.
+1.2.0 只有一个通用 NRO `mhgu_dps_meter.nro`，已分别测试兼容 FF14-style Damage Text、Damage Numbers r30 和 MHGU Attack Damage Display。兼容矩阵、冲突排查和链式 Hook 原理见研究笔记第 10 节。
+
+This folder contains reverse-engineering notes, failed experiments, damage-display compatibility notes, and reusable tools for maintainers and for anyone building similar MHGU plugins with Forge.
+
+Version 1.2.0 ships one universal NRO, `mhgu_dps_meter.nro`, tested with FF14-style Damage Text, Damage Numbers r30, and MHGU Attack Damage Display. See section 10 of the research notes for the compatibility matrix, conflict checks, and chain-hook mechanism.
 
 ## Notes / 笔记
 

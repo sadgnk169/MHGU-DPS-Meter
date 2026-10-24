@@ -19,8 +19,10 @@ bash build.sh
 输出：
 
 ```text
-source/dist/00_mhgu_dps_meter.nro
+source/dist/mhgu_dps_meter.nro
 ```
+
+这个 NRO 同时兼容 FF14-style Damage Text v0.1.1 和 Damage Numbers r30。Hook 会延迟到第一次更新安装，以便接在 Damage Numbers 后面。
 
 构建依赖固定为：
 

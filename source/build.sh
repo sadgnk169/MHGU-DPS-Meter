@@ -37,5 +37,6 @@ unset CARGO_TARGET_DIR
 cargo +nightly metadata --format-version 1 >/dev/null
 cargo +nightly forge build --release
 mkdir -p "$task_root/dist"
-mv -f -- "$task_root/mhgu_dps_meter.nro" "$task_root/dist/00_mhgu_dps_meter.nro"
-printf '编译完成：%s/dist/00_mhgu_dps_meter.nro\n' "$task_root"
+cp -f -- "$task_root/mhgu_dps_meter.nro" "$task_root/dist/mhgu_dps_meter.nro"
+printf '编译完成：%s/dist/mhgu_dps_meter.nro
+' "$task_root"
