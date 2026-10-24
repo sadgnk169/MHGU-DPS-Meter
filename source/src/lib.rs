@@ -540,6 +540,7 @@ fn palico_icon(palico_type: u32) -> Option<usize> {
         0x68 => Some(21),
         0xD4 => Some(22),
         0x26 => Some(23),
+        0x1F => Some(23),
         _ => None,
     }
 }
