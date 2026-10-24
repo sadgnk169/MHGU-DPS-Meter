@@ -43,7 +43,7 @@ bash build.sh
 发布源码的 `Cargo.toml` 使用 GitHub 上的 Forge。网络受限时，可以把依赖临时改成工作区里的本地 Forge：
 
 ```toml
-mhgu-forge = { path = "D:/zcode/MHGU/_build/forge-rs/forge", default-features = false, features = ["imgui", "mt"] }
+mhgu-forge = { path = "<本地 Forge 源码目录>/forge", default-features = false, features = ["imgui", "mt"] }
 ```
 
 构建完成后恢复为 git 依赖，不要把这个本地路径提交到发布仓库。
