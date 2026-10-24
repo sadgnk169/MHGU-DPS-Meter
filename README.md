@@ -120,6 +120,10 @@ dps_show_percent_bar = true
 dps_show_weapon = true
 ```
 
+### 许可证
+
+插件代码使用 MIT License，见 `LICENSE`。内置 Noto Sans SC 字体使用 SIL Open Font License 1.1，见 `OFL.txt`。
+
 ### 开发资料
 
 内存偏移、Hook 流程、猎猫类型调查的失败实验、NRO 重定位检查和原始诊断日志都在 [research/](research/README.md)，供维护者和想用 Forge 做类似插件的人参考。
@@ -201,3 +205,7 @@ After editing the INI manually, fully restart the game. Menu changes preview imm
 ### Development notes
 
 Memory offsets, hook flow, the failed Palico-type investigation, NRO relocation checks, and the raw diagnostic log are in [research/](research/README.md), for maintainers and anyone building similar Forge plugins.
+
+### License
+
+Plugin code is MIT licensed, see `LICENSE`. The bundled Noto Sans SC font is licensed under SIL OFL 1.1, see `OFL.txt`.

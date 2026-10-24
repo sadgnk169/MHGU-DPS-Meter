@@ -220,10 +220,11 @@ A release contains only runtime files:
 ```text
 MHGU-DPS-Meter-v1.2.0.zip
   README.md
+  LICENSE
+  OFL.txt
   conf/mhgu_dps_meter.ini
   docs/demo.jpg
   romfs/nativeNX/forge/fonts/NotoSansSC-Medium.otf
-  OFL.txt
   romfs/nativeNX/plugins/mhgu_dps_meter.nro
 ```
 
