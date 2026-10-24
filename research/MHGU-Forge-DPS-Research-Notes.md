@@ -43,7 +43,7 @@ bash build.sh
 The release source depends on Forge from GitHub. When the network is unavailable, temporarily point the dependency at the local Forge checkout in this workspace:
 
 ```toml
-mhgu-forge = { path = "D:/zcode/MHGU/_build/forge-rs/forge", default-features = false, features = ["imgui", "mt"] }
+mhgu-forge = { path = "<path-to-local-forge>/forge", default-features = false, features = ["imgui", "mt"] }
 ```
 
 Restore the git dependency after building. Do not commit the local path to the release repository.
