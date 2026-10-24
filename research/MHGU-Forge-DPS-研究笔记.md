@@ -138,7 +138,7 @@ pub struct Epoch {
 - 面板默认字号 `DPS_FONT_SIZE = 19.0`，以 720p 为基准，按 `display.height / 720` 缩放。
 - 曲线宽度、高度、填充、名字、hits、inline stats、队伍合计等都在 INI 中配置。
 - 配置路径：`savedata:/mhgu_dps_meter.ini`；默认模板在 `source/conf/mhgu_dps_meter.ini`，编译时嵌入。
-- 中文字体：`romfs/nativeNX/forge/fonts/NotoSansSC-Medium.otf`，OFL 授权，许可证在 `OFL.txt`。
+- 中文字体：`romfs/nativeNX/forge/fonts/NotoSansSC-Medium.otf`，OFL 授权，许可证在发布包根目录的 `OFL.txt`。
 
 ### 5.1 图标
 
@@ -223,7 +223,7 @@ MHGU-DPS-Meter-v1.2.0.zip
   conf/mhgu_dps_meter.ini
   docs/demo.jpg
   romfs/nativeNX/forge/fonts/NotoSansSC-Medium.otf
-  romfs/nativeNX/forge/fonts/OFL.txt
+  OFL.txt
   romfs/nativeNX/plugins/mhgu_dps_meter.nro
 ```
 

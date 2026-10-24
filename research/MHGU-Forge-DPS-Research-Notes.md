@@ -138,7 +138,7 @@ The collision and damage callbacks do not share a call stack. The code identifie
 - The default font size is `DPS_FONT_SIZE = 19.0` at the 720p reference, scaled by `display.height / 720`.
 - Curve width/height/fill, names, hit count, inline stats, and team summary are configured in the INI.
 - Config path: `savedata:/mhgu_dps_meter.ini`. The default template is `source/conf/mhgu_dps_meter.ini`, embedded at compile time.
-- CJK font: `romfs/nativeNX/forge/fonts/NotoSansSC-Medium.otf`, OFL licensed; the license is in `OFL.txt`.
+- CJK font: `romfs/nativeNX/forge/fonts/NotoSansSC-Medium.otf`, OFL licensed; the license is in `OFL.txt` at the package root.
 
 ### 5.1 Icons
 
@@ -223,7 +223,7 @@ MHGU-DPS-Meter-v1.2.0.zip
   conf/mhgu_dps_meter.ini
   docs/demo.jpg
   romfs/nativeNX/forge/fonts/NotoSansSC-Medium.otf
-  romfs/nativeNX/forge/fonts/OFL.txt
+  OFL.txt
   romfs/nativeNX/plugins/mhgu_dps_meter.nro
 ```
 

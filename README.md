@@ -36,7 +36,6 @@ DPS 统计可能让部分玩家感到压力或不适。联机时请尊重队友�
 2. 把 `romfs` 目录放到 MHGU 的 mod 目录，确保包含：
    - `romfs/nativeNX/plugins/mhgu_dps_meter.nro`
    - `romfs/nativeNX/forge/fonts/NotoSansSC-Medium.otf`
-   - `romfs/nativeNX/forge/fonts/OFL.txt`
 3. 把 `conf/mhgu_dps_meter.ini` 放到 MHGU 当前用户的存档根目录，或首次运行时让插件自动生成；
 4. 完全退出并重启游戏；
 5. 在 Forge 菜单中确认 `Enable DPS meter` 已开启。
@@ -44,9 +43,9 @@ DPS 统计可能让部分玩家感到压力或不适。联机时请尊重队友�
 ### 使用
 
 - 面板默认显示在画面左侧、玩家名字下方；
-- 默认行标签为 `You / P1 / P2 / P3 / P4`；这些是 slot 标签，不代表队伍顺序或主机顺序；
+- 默认行标签为 `You / P1 / P2 / P3 / P4`；
 - 行按伤害从高到低排列；
-- 换区会保留 DPS 累计，只会清理旧的浮动伤害数字；结算或保存画面出现约 60 帧（视帧率约 1–2 秒）后自动清零；
+- 换区会保留 DPS 累计，结算或保存画面出现约 60 帧（视帧率约 1–2 秒）后自动清零；
 - 单人任务也会显示；两名及以上玩家时显示底部全队统计；
 - 关闭统计：在 Forge 菜单取消 `Enable DPS meter`，或把 INI 的 `enabled` 改为 `false`；
 - 重置本轮数据：使用 Forge 菜单中的 `Reset DPS`。
@@ -157,17 +156,16 @@ This release has a single NRO, `mhgu_dps_meter.nro`, tested with:
 2. Copy the `romfs` directory into the MHGU mod directory, including:
    - `romfs/nativeNX/plugins/mhgu_dps_meter.nro`
    - `romfs/nativeNX/forge/fonts/NotoSansSC-Medium.otf`
-   - `romfs/nativeNX/forge/fonts/OFL.txt`
-3. Copy `conf/mhgu_dps_meter.ini` to the MHGU save root, or let the plugin create it on first launch.
+3. Copy `conf/mhgu_dps_meter.ini` to the MHGU save root, or let the plugin create it on first launch. 
 4. Fully exit and restart the game.
 5. Enable `Enable DPS meter` in the Forge menu.
 
 ### Usage
 
 - The panel appears on the left, below the player/party names.
-- Default labels are `You / P1 / P2 / P3 / P4`. These are slot labels, not party order or host order.
+- Default labels are `You / P1 / P2 / P3 / P4`. 
 - Rows are sorted by damage, highest first.
-- Area changes keep DPS totals; only old floating damage numbers are cleared. Data clears about 60 frames (roughly 1–2 seconds depending on frame rate) after the save/result screen appears.
+- Area changes keep DPS totals;  Data clears about 60 frames (roughly 1–2 seconds depending on frame rate) after the save/result screen appears.
 - Single-player quests are supported; the team summary appears with two or more players.
 - To disable the overlay, turn off `Enable DPS meter` or set `enabled = false` in the INI.
 - To reset the current run, use `Reset DPS` in the Forge menu.
