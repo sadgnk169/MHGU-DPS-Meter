@@ -267,6 +267,13 @@ impl HistorySample {
 }
 
 #[derive(Clone, Copy)]
+enum QuestSession {
+    Unknown,
+    Town,
+    Quest(u32),
+}
+
+#[derive(Clone, Copy)]
 struct DpsState {
     owners: [OwnerDps; 4],
     count: usize,
@@ -275,7 +282,7 @@ struct DpsState {
     active: bool,
     visible: bool,
     in_quest: bool,
-    result_frames: u32,
+    quest_id: u32,
     history: [HistorySample; HISTORY_CAP],
     history_len: usize,
     last_sample: f32,
@@ -291,7 +298,7 @@ impl DpsState {
             active: false,
             visible: true,
             in_quest: false,
-            result_frames: 0,
+            quest_id: 0,
             history: [HistorySample::EMPTY; HISTORY_CAP],
             history_len: 0,
             last_sample: 0.0,
@@ -314,18 +321,17 @@ impl DpsState {
     }
 
 
-    // Save/result screens have no local player object. Require a short
-    // debounce so area loading cannot clear an active run.
-    fn on_result_screen(&mut self, result: bool) {
-        if result {
-            self.result_frames = self.result_frames.saturating_add(1);
-            if self.result_frames >= 60 {
-                self.reset();
-                self.in_quest = false;
-            }
-        } else {
-            self.result_frames = 0;
-            if !self.in_quest {
+    // A missing player can mean loading or results, not the end of a quest.
+    // Preserve totals until the next quest, including a replay after town.
+    fn on_session(&mut self, session: QuestSession) {
+        match session {
+            QuestSession::Unknown | QuestSession::Quest(0) => {}
+            QuestSession::Town => self.in_quest = false,
+            QuestSession::Quest(id) => {
+                if !self.in_quest || self.quest_id != id {
+                    self.reset();
+                }
+                self.quest_id = id;
                 self.in_quest = true;
             }
         }
@@ -669,7 +675,8 @@ pub extern "C" fn forge_onUpdate(dt: f32) {
     }
     let mut snapshot = STATE.with(|state| state.snapshot());
     let player = unsafe { local_player(base) };
-    DPS.with(|dps| dps.on_result_screen(player < 0x10000));
+    let session = unsafe { quest_session(base, player) };
+    DPS.with(|dps| dps.on_session(session));
     // Quest/room transitions flush even when the last damage number has already expired.
     if player >= 0x10000
         && snapshot.epoch.player != 0
@@ -1573,7 +1580,7 @@ fn history_start(_dps: &DpsState) -> usize {
 
 fn draw_dps() {
     let dps = DPS.with(|state| *state);
-    if !dps.visible || !dps.active || dps.total == 0 || dps.count == 0 {
+    if !dps.visible || !dps.in_quest || !dps.active || dps.total == 0 || dps.count == 0 {
         return;
     }
     let state = STATE.with(|state| state.snapshot());
@@ -1711,8 +1718,42 @@ fn thread_key() -> u32 {
 }
 
 unsafe fn local_player(base: u32) -> u32 {
+    let manager = unsafe { read_u32(base + 0x01885B58) };
+    if manager < 0x10000 {
+        return 0;
+    }
     let get: unsafe extern "C" fn(u32) -> u32 = unsafe { mem::transmute(base + 0x00276278) };
-    unsafe { get(read_u32(base + 0x01885B58)) }
+    unsafe { get(manager) }
+}
+
+unsafe fn quest_session(base: u32, player: u32) -> QuestSession {
+    if player < 0x10000 {
+        return QuestSession::Unknown;
+    }
+    // MHGU 1.4.0: sGameControl + 0x4c is the town type (0xff in quests).
+    let control = unsafe { read_u32(base + 0x0188CA48) };
+    if control < 0x10000 {
+        return QuestSession::Unknown;
+    }
+    match unsafe { read_u8(control + 0x4c) } {
+        0..=7 => QuestSession::Town,
+        0xff => {
+            // sQuest + 0xa4 points to cQuestData; its quest number is at +8.
+            let quest = unsafe { read_u32(base + 0x0188AD90) };
+            if quest < 0x10000 {
+                return QuestSession::Unknown;
+            }
+            let data = unsafe { read_u32(quest + 0xa4) };
+            if data < 0x10000 {
+                return QuestSession::Unknown;
+            }
+            match unsafe { read_u32(data + 8) } {
+                0 => QuestSession::Unknown,
+                id => QuestSession::Quest(id),
+            }
+        }
+        _ => QuestSession::Unknown,
+    }
 }
 
 unsafe fn epoch(player: u32) -> Epoch {
