@@ -5,3 +5,4 @@ source/dist/
 *.tmp
 __pycache__/
 .DS_Store
+source/Cargo.lock

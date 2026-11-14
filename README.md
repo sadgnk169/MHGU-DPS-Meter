@@ -50,6 +50,12 @@ DPS 统计可能让部分玩家感到压力或不适。联机时请尊重队友�
 - 关闭统计：在 Forge 菜单取消 `Enable DPS meter`，或把 INI 的 `enabled` 改为 `false`；
 - 重置本轮数据：使用 Forge 菜单中的 `Reset DPS`。
 
+### Purple-lib（可选）
+
+1.3.0 起支持 [Purple-lib](https://gamebanana.com/mods/740376)：安装 Purple-lib 后，游戏开始菜单的 **Options > Mod Options** 里会出现 `MHGU DPS Meter` 页，可以直接调整 16 项常用设置（显示项、武器图标、玩家名字、图表、百分比条、面板位置、背景透明度、重置 DPS），每一行都有底部说明，改动即时生效，关闭窗口后自动写回 `mhgu_dps_meter.ini`。
+
+Purple-lib 不是必需的。没有安装时插件行为与之前完全一致，Forge 设置页仍然可用。
+
 ### 配置
 
 配置文件是存档根目录的 `mhgu_dps_meter.ini`，也可以在 Forge → Plugin UI → `MHGU DPS Meter` 中修改。
@@ -173,6 +179,12 @@ This release has a single NRO, `mhgu_dps_meter.nro`, tested with:
 - Single-player quests are supported; the team summary appears with two or more players.
 - To disable the overlay, turn off `Enable DPS meter` or set `enabled = false` in the INI.
 - To reset the current run, use `Reset DPS` in the Forge menu.
+
+### Purple-lib (optional)
+
+Version 1.3.0 supports [Purple-lib](https://gamebanana.com/mods/740376). With Purple-lib installed, **Options > Mod Options** in the game's start menu gains an `MHGU DPS Meter` page with 16 common settings (display toggles, weapon icons, player names, chart, percent bar, panel position, background opacity, Reset DPS). Every row has a help-bar line, changes apply immediately, and closing the window saves them to `mhgu_dps_meter.ini`.
+
+Purple-lib is not required. Without it the plugin behaves exactly as before and the Forge settings page still works.
 
 ### Configuration
 

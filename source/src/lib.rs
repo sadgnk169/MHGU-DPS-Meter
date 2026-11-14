@@ -3,6 +3,7 @@
 
 mod data;
 mod icons;
+mod purple_lib;
 #[path = "../shared/plugin_config.rs"]
 mod plugin_config;
 
@@ -588,6 +589,7 @@ fn main() {
     set_font_input(config);
     STATE.with(|state| state.config = config);
     ENABLED.store(config.enabled, Ordering::Relaxed);
+    purple_lib::init(&config);
     // Install after all plugins' forge_onInit so Damage Numbers can install first.
     info!(
         "mhgu-dps-meter v{}: hooks deferred, main=0x{base:08X}",
@@ -648,6 +650,27 @@ pub extern "C" fn forge_onUpdate(dt: f32) {
     let base = GAME_BASE.load(Ordering::Relaxed);
     FRAME.fetch_add(1, Ordering::Relaxed);
     let dt = if dt.is_finite() && dt > 0.0 { dt } else { 1.0 / 60.0 };
+    // Purple-lib 设置页的改动在游戏更新里应用；它的 get/set 回调只读写原子变量。
+    let changed_rows = purple_lib::take_dirty();
+    if changed_rows != 0 {
+        let config = MENU.with(|edit| {
+            purple_lib::apply(&mut edit.draft, changed_rows);
+            edit.draft
+        });
+        let changed = ENABLED.swap(config.enabled, Ordering::Relaxed) != config.enabled;
+        STATE.with(|state| {
+            if changed {
+                state.clear();
+            }
+            state.config = config;
+        });
+    }
+    if purple_lib::take_reset() {
+        DPS.with(|dps| dps.reset_now());
+    }
+    if purple_lib::take_save() {
+        save_config_from_menu();
+    }
     if !INSTALLED.load(Ordering::Acquire) && !HOOK_ATTEMPTED.swap(true, Ordering::AcqRel) {
         if compatible(base) {
             unsafe { install_hooks(base) };
@@ -1677,6 +1700,23 @@ fn draw_settings_body() {
             }
             state.config = config;
         });
+        purple_lib::sync(&config);
+    });
+}
+
+fn save_config_from_menu() {
+    MENU.with(|edit| {
+        let mut text = plugin_config::Text::<CONFIG_MAX_BYTES>::new();
+        edit.message = match edit.draft.write_ini(&mut text) {
+            Ok(()) => match plugin_config::DAMAGE.save(text.as_str()) {
+                Ok(()) => {
+                    edit.saved = edit.draft;
+                    "Saved to MHGU save INI."
+                }
+                Err(message) => message,
+            },
+            Err(_) => "Configuration too large.",
+        };
     });
 }
 
