@@ -562,6 +562,7 @@ const PALICO_ICON: usize = 15;
 const PALICO_ICON_LIFT: f32 = 2.0;
 static FRAME: AtomicU32 = AtomicU32::new(0);
 static HOOK_ATTEMPTED: AtomicBool = AtomicBool::new(false);
+static SETTINGS_OPEN: AtomicBool = AtomicBool::new(false);
 
 #[unsafe(no_mangle)]
 pub extern "C" fn forge_onLoad(params: *mut forge::sys::init::PluginInitParams) {
@@ -910,7 +911,7 @@ fn draw_pixel_icon(
         }
     }
 }
-fn draw_dps_curve(dps: &DpsState, config: &Config, display: DisplayArea) {
+fn draw_dps_curve(dps: &DpsState, config: &Config, display: DisplayArea) -> [f32; 4] {
     let scale = display.height / 720.0;
     let font = unsafe { CUSTOM_FONT }.unwrap_or_else(imgui::ImFont::current);
     let font_size = DPS_FONT_SIZE * scale;
@@ -1588,6 +1589,7 @@ fn draw_dps_curve(dps: &DpsState, config: &Config, display: DisplayArea) {
             );
         }
     }
+    [x, y, width, height]
 }
 
 fn history_start(_dps: &DpsState) -> usize {
@@ -1597,19 +1599,124 @@ fn history_start(_dps: &DpsState) -> usize {
 fn draw_dps() {
     let dps = DPS.with(|state| *state);
     if !dps.visible || !dps.active || dps.total == 0 || dps.count == 0 {
+        if preview_requested() {
+            draw_preview();
+        }
         return;
     }
     let state = STATE.with(|state| state.snapshot());
     let display = state.display;
     let config = state.config;
-    draw_dps_curve(&dps, &config, display);
+    let _ = draw_dps_curve(&dps, &config, display);
+}
+
+/// 打开本插件的设置页（Purple-lib 或 Forge）且没有真实任务数据时，显示假数据预览。
+fn preview_requested() -> bool {
+    if purple_lib::page_shown() {
+        return true;
+    }
+    forge::graphics::Graphics::is_menu_visible() && SETTINGS_OPEN.load(Ordering::Relaxed)
+}
+
+fn preview_name(text: &str) -> PlayerName {
+    let mut name = PlayerName::EMPTY;
+    let bytes = text.as_bytes();
+    let len = bytes.len().min(name.bytes.len() - 1);
+    name.bytes[..len].copy_from_slice(&bytes[..len]);
+    name.len = len as u8;
+    name
+}
+
+/// 固定假数据：4 名玩家、3 分钟累计曲线、一个猎猫图标行。
+fn preview_dps() -> DpsState {
+    const DAMAGE: [u32; 4] = [2704, 1906, 1564, 1549];
+    const HITS: [u32; 4] = [128, 96, 74, 80];
+    const COLOR: [u8; 4] = [0, 1, 3, 2];
+    const WEAPON: [u8; 4] = [0, 2, 6, 15];
+    const NAMES: [&str; 4] = ["You", "Hunter A", "Hunter B", "Hunter C"];
+
+    let mut dps = DpsState::new();
+    let mut total = 0u64;
+    let mut i = 0usize;
+    while i < 4 {
+        dps.owners[i] = OwnerDps {
+            owner: 0,
+            local: i == 0,
+            damage: DAMAGE[i] as u64,
+            hits: HITS[i],
+            slot: i as u8,
+            color: COLOR[i],
+            weapon: WEAPON[i],
+            name: preview_name(NAMES[i]),
+        };
+        total += DAMAGE[i] as u64;
+        i += 1;
+    }
+    dps.count = 4;
+    dps.total = total;
+    dps.elapsed = 180.0;
+    dps.active = true;
+    dps.visible = true;
+    dps.in_quest = true;
+
+    let mut sample = 0usize;
+    while sample < 180 {
+        let progress = (sample as f32 + 1.0) / 180.0;
+        let mut damage = [0u32; 4];
+        let mut k = 0usize;
+        while k < 4 {
+            damage[k] = (DAMAGE[k] as f32 * progress) as u32;
+            k += 1;
+        }
+        dps.history[sample] = HistorySample {
+            time: sample as f32,
+            damage,
+        };
+        sample += 1;
+    }
+    dps.history_len = 180;
+    dps.last_sample = 179.0;
+    dps
+}
+
+fn draw_preview() {
+    let (config, display) = STATE.with(|state| (state.config(), state.display()));
+    if !config.enabled || display.width < 320.0 || display.height < 240.0 {
+        return;
+    }
+    let preview = preview_dps();
+    let bounds = draw_dps_curve(&preview, &config, display);
+
+    let scale = display.height / 720.0;
+    let size = 10.0 * scale;
+    let font = unsafe { CUSTOM_FONT }.unwrap_or_else(imgui::ImFont::current);
+    let text = "PREVIEW";
+    let width = measure_text(&font, size, text);
+    let x = bounds[0];
+    let y = (bounds[1] - size - 4.0 * scale).max(0.0);
+    let draw = imgui::DrawList::foreground();
+    draw.add_rect_filled(
+        ImVec2::new(x, y),
+        ImVec2::new(x + width + 6.0 * scale, y + size + 4.0 * scale),
+        imgui::color(0, 0, 0, 140),
+        0.0,
+    );
+    draw.add_text_with_font(
+        &font,
+        size,
+        ImVec2::new(x + 3.0 * scale, y + 2.0 * scale),
+        imgui::color(255, 255, 255, 200),
+        text,
+    );
 }
 
 #[forge::imgui_render]
 fn draw_settings() {
     // Forge 共用一个 Plugin UI 窗口；折叠标题不会替内部控件建立 ID 作用域。
     imgui::push_id(imgui::Id::Str(c"mhgu_dps_meter"));
-    if imgui::tree_node(c"MHGU DPS Meter") {
+    let open = imgui::tree_node(c"MHGU DPS Meter");
+    SETTINGS_OPEN.store(open, Ordering::Relaxed);
+    if open {
         draw_settings_body();
         imgui::tree_pop();
     }

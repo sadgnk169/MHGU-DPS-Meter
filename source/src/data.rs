@@ -506,6 +506,14 @@ impl State {
         self.display = display;
     }
 
+    pub fn config(&self) -> Config {
+        self.config
+    }
+
+    pub fn display(&self) -> DisplayArea {
+        self.display
+    }
+
     pub fn snapshot(&self) -> Snapshot {
         Snapshot {
             config: self.config,

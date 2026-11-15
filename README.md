@@ -49,6 +49,7 @@ DPS 统计可能让部分玩家感到压力或不适。联机时请尊重队友�
 - 单人任务也会显示；两名及以上玩家时显示底部全队统计；
 - 关闭统计：在 Forge 菜单取消 `Enable DPS meter`，或把 INI 的 `enabled` 改为 `false`；
 - 重置本轮数据：使用 Forge 菜单中的 `Reset DPS`。
+- 打开设置页时会在配置的位置显示一份带 `PREVIEW` 角标的假数据面板，任务外也能预览位置、透明度、曲线和显示项；主机 1080p 与掌机 720p 自动缩放。
 
 ### Purple-lib（可选）
 
@@ -179,6 +180,7 @@ This release has a single NRO, `mhgu_dps_meter.nro`, tested with:
 - Single-player quests are supported; the team summary appears with two or more players.
 - To disable the overlay, turn off `Enable DPS meter` or set `enabled = false` in the INI.
 - To reset the current run, use `Reset DPS` in the Forge menu.
+- While a settings page is open, a mock panel with fixed data and a `PREVIEW` badge is drawn at the configured position, so layout, opacity, chart and display toggles can be previewed outside quests. It scales automatically between 720p handheld and 1080p docked.
 
 ### Purple-lib (optional)
 

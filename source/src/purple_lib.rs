@@ -9,7 +9,7 @@
 use core::{
     ffi::{c_char, c_void},
     ptr,
-    sync::atomic::{AtomicBool, AtomicU32, Ordering},
+    sync::atomic::{AtomicBool, AtomicPtr, AtomicU32, Ordering},
 };
 
 use crate::data::Config;
@@ -254,6 +254,7 @@ static SETTINGS: [&AtomicU32; VALUE_ROWS as usize] = [
 static CHANGED: AtomicU32 = AtomicU32::new(0);
 static SAVE: AtomicBool = AtomicBool::new(false);
 static RESET: AtomicBool = AtomicBool::new(false);
+static API: AtomicPtr<Api> = AtomicPtr::new(ptr::null_mut());
 
 extern "C" fn title(_: *mut c_void, _: u32) -> *const c_char {
     c"MHGU DPS Meter".as_ptr()
@@ -476,6 +477,13 @@ pub fn take_reset() -> bool {
     RESET.swap(false, Ordering::AcqRel)
 }
 
+/// 当前是否正显示本插件的 Mod Options 页。
+pub fn page_shown() -> bool {
+    // SAFETY: 空指针，或 Purple-lib 提供的、整局有效的函数表。
+    unsafe { API.load(Ordering::Acquire).as_ref() }
+        .is_some_and(|api| (api.options_shown)(&OPTIONS.0))
+}
+
 /// Purple-lib 在第一次 `forge_onUpdate` 里按名字调用；这里只注册设置页。
 ///
 /// # Safety
@@ -489,6 +497,7 @@ pub unsafe extern "C" fn purplelib_on_register(api: *const Api) {
     if table.version < API_VERSION {
         return;
     }
+    API.store(api.cast_mut(), Ordering::Release);
     let added = (table.add_options)(&OPTIONS.0);
     if added {
         info!(
