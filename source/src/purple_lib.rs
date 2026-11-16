@@ -23,11 +23,10 @@ const ROW_ACTION: u32 = 3;
 /// 数字行不在首尾回绕。
 const ROW_NO_WRAP: u32 = 1;
 
-/// 本页总行数（2 整页，每页 8 行）。
-const ROW_COUNT: u32 = 16;
-/// 有值、会调用 get/set 的行数；最后一行动作行没有值。
-const VALUE_ROWS: u32 = 15;
-const RESET_ROW: u32 = 15;
+/// 本页总行数（3 页：8 + 8 + 4）。
+const ROW_COUNT: u32 = 20;
+const RESET_DPS_ROW: u32 = 18;
+const RESET_SETTINGS_ROW: u32 = 19;
 
 #[repr(C)]
 pub struct OptionRow {
@@ -102,9 +101,12 @@ struct ActionLabel([*const c_char; 1]);
 // SAFETY: 同上。
 unsafe impl Sync for ActionLabel {}
 
-static RESET_EN: ActionLabel = ActionLabel([c"Reset".as_ptr()]);
-static RESET_HANS: ActionLabel = ActionLabel([c"重置".as_ptr()]);
-static RESET_HANT: ActionLabel = ActionLabel([c"重設".as_ptr()]);
+static RESET_DPS_EN: ActionLabel = ActionLabel([c"Reset".as_ptr()]);
+static RESET_DPS_HANS: ActionLabel = ActionLabel([c"重置 DPS".as_ptr()]);
+static RESET_DPS_HANT: ActionLabel = ActionLabel([c"重設 DPS".as_ptr()]);
+static RESET_ALL_EN: ActionLabel = ActionLabel([c"Reset".as_ptr()]);
+static RESET_ALL_HANS: ActionLabel = ActionLabel([c"恢复默认".as_ptr()]);
+static RESET_ALL_HANT: ActionLabel = ActionLabel([c"恢復預設".as_ptr()]);
 
 static NAMES_EN: [&core::ffi::CStr; ROW_COUNT as usize] = [
     c"DPS meter",
@@ -115,14 +117,18 @@ static NAMES_EN: [&core::ffi::CStr; ROW_COUNT as usize] = [
     c"Show hits",
     c"Team summary",
     c"Inline stats",
+    c"Overlay size",
+    c"Black background",
+    c"Background",
+    c"Show chart",
+    c"Curve fill",
+    c"Percent bar",
     c"Weapon icons",
     c"Player names",
-    c"Show chart",
-    c"Percent bar",
     c"Panel X",
     c"Panel Y",
-    c"Background",
     c"Reset DPS",
+    c"Reset settings",
 ];
 static NAMES_HANS: [&core::ffi::CStr; ROW_COUNT as usize] = [
     c"DPS 计量",
@@ -133,14 +139,18 @@ static NAMES_HANS: [&core::ffi::CStr; ROW_COUNT as usize] = [
     c"显示命中数",
     c"队伍合计",
     c"内联数据",
+    c"面板大小",
+    c"黑色背景",
+    c"背景透明度",
+    c"显示图表",
+    c"曲线填充",
+    c"百分比条",
     c"武器图标",
     c"玩家名字",
-    c"显示图表",
-    c"百分比条",
     c"面板 X",
     c"面板 Y",
-    c"背景透明度",
     c"重置 DPS",
+    c"恢复默认设置",
 ];
 static NAMES_HANT: [&core::ffi::CStr; ROW_COUNT as usize] = [
     c"DPS 計量",
@@ -151,14 +161,18 @@ static NAMES_HANT: [&core::ffi::CStr; ROW_COUNT as usize] = [
     c"顯示命中數",
     c"隊伍合計",
     c"內聯數據",
+    c"面板大小",
+    c"黑色背景",
+    c"背景透明度",
+    c"顯示圖表",
+    c"曲線填充",
+    c"百分比條",
     c"武器圖示",
     c"玩家名稱",
-    c"顯示圖表",
-    c"百分比條",
     c"面板 X",
     c"面板 Y",
-    c"背景透明度",
     c"重設 DPS",
+    c"恢復預設設定",
 ];
 
 static HELP_EN: [Option<&core::ffi::CStr>; ROW_COUNT as usize] = [
@@ -170,14 +184,18 @@ static HELP_EN: [Option<&core::ffi::CStr>; ROW_COUNT as usize] = [
     Some(c"Show how many hits each hunter landed."),
     Some(c"Show the team's combined damage."),
     Some(c"Show each row's stats on one line."),
+    Some(c"Panel size, 50% to 300%, in steps of 5%."),
+    Some(c"Show or hide the panel's black background."),
+    Some(c"Panel background opacity, 0 to 255."),
+    Some(c"Draw the damage-over-time chart."),
+    Some(c"Fill the area under the chart."),
+    Some(c"Show the percent bar under the panel."),
     Some(c"Show the weapon icon of each hunter."),
     Some(c"Show hunter names instead of colours only."),
-    Some(c"Draw the damage-over-time chart."),
-    Some(c"Show the percent bar under the panel."),
     Some(c"Moves the panel right in steps of 5 pixels."),
     Some(c"Moves the panel down in steps of 5 pixels."),
-    Some(c"Panel background opacity, 0 to 255."),
     Some(c"Clear the current DPS totals and chart."),
+    Some(c"Reset every setting to its default and save."),
 ];
 static HELP_HANS: [Option<&core::ffi::CStr>; ROW_COUNT as usize] = [
     Some(c"开启或关闭伤害计量。"),
@@ -188,14 +206,18 @@ static HELP_HANS: [Option<&core::ffi::CStr>; ROW_COUNT as usize] = [
     Some(c"显示每位猎人的命中次数。"),
     Some(c"显示队伍的总伤害。"),
     Some(c"把每行的统计数据排在同一行。"),
+    Some(c"面板大小，50% 到 300%，每档 5%。"),
+    Some(c"显示或隐藏面板的黑色背景。"),
+    Some(c"面板背景不透明度，0 到 255。"),
+    Some(c"绘制伤害随时间变化的图表。"),
+    Some(c"填充图表下方的区域。"),
+    Some(c"在面板下方显示百分比条。"),
     Some(c"显示每位猎人的武器图标。"),
     Some(c"显示猎人名字，而不只是颜色。"),
-    Some(c"绘制伤害随时间变化的图表。"),
-    Some(c"在面板下方显示百分比条。"),
     Some(c"以 5 像素为一步右移面板。"),
     Some(c"以 5 像素为一步下移面板。"),
-    Some(c"面板背景不透明度，0 到 255。"),
     Some(c"清空当前 DPS 累计和图表。"),
+    Some(c"恢复所有设置为默认值并保存。"),
 ];
 static HELP_HANT: [Option<&core::ffi::CStr>; ROW_COUNT as usize] = [
     Some(c"開啟或關閉傷害計量。"),
@@ -206,17 +228,20 @@ static HELP_HANT: [Option<&core::ffi::CStr>; ROW_COUNT as usize] = [
     Some(c"顯示每位獵人的命中次數。"),
     Some(c"顯示隊伍的總傷害。"),
     Some(c"把每行的統計數據排在同一行。"),
+    Some(c"面板大小，50% 到 300%，每檔 5%。"),
+    Some(c"顯示或隱藏面板的黑色背景。"),
+    Some(c"面板背景不透明度，0 到 255。"),
+    Some(c"繪製傷害隨時間變化的圖表。"),
+    Some(c"填充圖表下方的區域。"),
+    Some(c"在面板下方顯示百分比條。"),
     Some(c"顯示每位獵人的武器圖示。"),
     Some(c"顯示獵人名稱，而不只是顏色。"),
-    Some(c"繪製傷害隨時間變化的圖表。"),
-    Some(c"在面板下方顯示百分比條。"),
     Some(c"以 5 像素為一步右移面板。"),
     Some(c"以 5 像素為一步下移面板。"),
-    Some(c"面板背景不透明度，0 到 255。"),
     Some(c"清空目前 DPS 累計和圖表。"),
+    Some(c"恢復所有設定為預設值並保存。"),
 ];
 
-// 数值行的值以“第几档”保存：面板坐标每档 5px，背景透明度每档 5。
 static ENABLED: AtomicU32 = AtomicU32::new(1);
 static TIMER: AtomicU32 = AtomicU32::new(1);
 static DAMAGE: AtomicU32 = AtomicU32::new(1);
@@ -225,15 +250,19 @@ static SHOW_DPS: AtomicU32 = AtomicU32::new(1);
 static HITS: AtomicU32 = AtomicU32::new(1);
 static TEAM: AtomicU32 = AtomicU32::new(1);
 static INLINE: AtomicU32 = AtomicU32::new(1);
+static SCALE: AtomicU32 = AtomicU32::new(10);
+static BG_ENABLED: AtomicU32 = AtomicU32::new(1);
+static BACKGROUND: AtomicU32 = AtomicU32::new(19);
+static CHART: AtomicU32 = AtomicU32::new(1);
+static CURVE_FILL: AtomicU32 = AtomicU32::new(1);
+static PERCENT_BAR: AtomicU32 = AtomicU32::new(1);
 static WEAPON: AtomicU32 = AtomicU32::new(1);
 static NAMES: AtomicU32 = AtomicU32::new(0);
-static CHART: AtomicU32 = AtomicU32::new(1);
-static PERCENT_BAR: AtomicU32 = AtomicU32::new(1);
 static PANEL_X: AtomicU32 = AtomicU32::new(0);
 static PANEL_Y: AtomicU32 = AtomicU32::new(68);
-static BACKGROUND: AtomicU32 = AtomicU32::new(19);
+static DUMMY: AtomicU32 = AtomicU32::new(0);
 
-static SETTINGS: [&AtomicU32; VALUE_ROWS as usize] = [
+static SETTINGS: [&AtomicU32; ROW_COUNT as usize] = [
     &ENABLED,
     &TIMER,
     &DAMAGE,
@@ -242,18 +271,24 @@ static SETTINGS: [&AtomicU32; VALUE_ROWS as usize] = [
     &HITS,
     &TEAM,
     &INLINE,
+    &SCALE,
+    &BG_ENABLED,
+    &BACKGROUND,
+    &CHART,
+    &CURVE_FILL,
+    &PERCENT_BAR,
     &WEAPON,
     &NAMES,
-    &CHART,
-    &PERCENT_BAR,
     &PANEL_X,
     &PANEL_Y,
-    &BACKGROUND,
+    &DUMMY,
+    &DUMMY,
 ];
 
 static CHANGED: AtomicU32 = AtomicU32::new(0);
 static SAVE: AtomicBool = AtomicBool::new(false);
 static RESET: AtomicBool = AtomicBool::new(false);
+static RESET_SETTINGS: AtomicBool = AtomicBool::new(false);
 static API: AtomicPtr<Api> = AtomicPtr::new(ptr::null_mut());
 
 extern "C" fn title(_: *mut c_void, _: u32) -> *const c_char {
@@ -292,7 +327,7 @@ extern "C" fn row(_: *mut c_void, language: u32, index: u32, out: *mut OptionRow
         out.help = help.as_ptr();
     }
     match index {
-        0..=11 => {
+        0..=7 | 9 | 11..=15 => {
             let labels = match lang {
                 Lang::Hans => &OFF_ON_HANS,
                 Lang::Hant => &OFF_ON_HANT,
@@ -302,17 +337,29 @@ extern "C" fn row(_: *mut c_void, language: u32, index: u32, out: *mut OptionRow
             out.labels = labels.0.as_ptr();
             out.label_count = 2;
         }
-        // 0..=1280，每档 5px。
-        12 => number_row(out, name.as_ptr(), 257, 0, 5),
-        // 0..=720，每档 5px。
-        13 => number_row(out, name.as_ptr(), 145, 0, 5),
+        // 50%..=300%，每档 5%。
+        8 => number_row(out, name.as_ptr(), 51, 50, 5),
         // 0..=255，每档 5。
-        14 => number_row(out, name.as_ptr(), 52, 0, 5),
-        15 => {
+        10 => number_row(out, name.as_ptr(), 52, 0, 5),
+        // 0..=1280，每档 5px。
+        16 => number_row(out, name.as_ptr(), 257, 0, 5),
+        // 0..=720，每档 5px。
+        17 => number_row(out, name.as_ptr(), 145, 0, 5),
+        18 => {
             let label = match lang {
-                Lang::Hans => &RESET_HANS,
-                Lang::Hant => &RESET_HANT,
-                Lang::En => &RESET_EN,
+                Lang::Hans => &RESET_DPS_HANS,
+                Lang::Hant => &RESET_DPS_HANT,
+                Lang::En => &RESET_DPS_EN,
+            };
+            out.kind = ROW_ACTION;
+            out.labels = label.0.as_ptr();
+            out.label_count = 1;
+        }
+        19 => {
+            let label = match lang {
+                Lang::Hans => &RESET_ALL_HANS,
+                Lang::Hant => &RESET_ALL_HANT,
+                Lang::En => &RESET_ALL_EN,
             };
             out.kind = ROW_ACTION;
             out.labels = label.0.as_ptr();
@@ -337,8 +384,10 @@ extern "C" fn set(_: *mut c_void, index: u32, value: u32) {
 }
 
 extern "C" fn action(_: *mut c_void, index: u32) {
-    if index == RESET_ROW {
+    if index == RESET_DPS_ROW {
         RESET.store(true, Ordering::Release);
+    } else if index == RESET_SETTINGS_ROW {
+        RESET_SETTINGS.store(true, Ordering::Release);
     }
 }
 
@@ -388,16 +437,23 @@ fn store(config: &Config) {
     HITS.store(flags(config.dps_show_hits), Ordering::Relaxed);
     TEAM.store(flags(config.dps_show_team), Ordering::Relaxed);
     INLINE.store(flags(config.dps_inline_stats), Ordering::Relaxed);
-    WEAPON.store(flags(config.dps_show_weapon), Ordering::Relaxed);
-    NAMES.store(flags(config.dps_show_names), Ordering::Relaxed);
-    CHART.store(flags(config.dps_show_curve), Ordering::Relaxed);
-    PERCENT_BAR.store(flags(config.dps_show_percent_bar), Ordering::Relaxed);
-    PANEL_X.store(index_of(config.dps_offset_x, 5.0, 256), Ordering::Relaxed);
-    PANEL_Y.store(index_of(config.dps_offset_y, 5.0, 144), Ordering::Relaxed);
+    // 50% 对应档位 0，300% 对应档位 50。
+    SCALE.store(
+        index_of(config.dps_scale * 100.0 - 50.0, 5.0, 50),
+        Ordering::Relaxed,
+    );
+    BG_ENABLED.store(flags(config.dps_show_background), Ordering::Relaxed);
     BACKGROUND.store(
         index_of(config.dps_background_alpha, 5.0, 51),
         Ordering::Relaxed,
     );
+    CHART.store(flags(config.dps_show_curve), Ordering::Relaxed);
+    CURVE_FILL.store(flags(config.dps_curve_fill), Ordering::Relaxed);
+    PERCENT_BAR.store(flags(config.dps_show_percent_bar), Ordering::Relaxed);
+    WEAPON.store(flags(config.dps_show_weapon), Ordering::Relaxed);
+    NAMES.store(flags(config.dps_show_names), Ordering::Relaxed);
+    PANEL_X.store(index_of(config.dps_offset_x, 5.0, 256), Ordering::Relaxed);
+    PANEL_Y.store(index_of(config.dps_offset_y, 5.0, 144), Ordering::Relaxed);
 }
 
 /// 初始化时把当前配置写进原子变量。
@@ -440,25 +496,34 @@ pub fn apply(config: &mut Config, changed: u32) {
         config.dps_inline_stats = value(&INLINE) != 0;
     }
     if changed & (1 << 8) != 0 {
-        config.dps_show_weapon = value(&WEAPON) != 0;
+        config.dps_scale = (50 + value(&SCALE) * 5) as f32 / 100.0;
     }
     if changed & (1 << 9) != 0 {
-        config.dps_show_names = value(&NAMES) != 0;
+        config.dps_show_background = value(&BG_ENABLED) != 0;
     }
     if changed & (1 << 10) != 0 {
-        config.dps_show_curve = value(&CHART) != 0;
+        config.dps_background_alpha = value(&BACKGROUND) as f32 * 5.0;
     }
     if changed & (1 << 11) != 0 {
-        config.dps_show_percent_bar = value(&PERCENT_BAR) != 0;
+        config.dps_show_curve = value(&CHART) != 0;
     }
     if changed & (1 << 12) != 0 {
-        config.dps_offset_x = value(&PANEL_X) as f32 * 5.0;
+        config.dps_curve_fill = value(&CURVE_FILL) != 0;
     }
     if changed & (1 << 13) != 0 {
-        config.dps_offset_y = value(&PANEL_Y) as f32 * 5.0;
+        config.dps_show_percent_bar = value(&PERCENT_BAR) != 0;
     }
     if changed & (1 << 14) != 0 {
-        config.dps_background_alpha = value(&BACKGROUND) as f32 * 5.0;
+        config.dps_show_weapon = value(&WEAPON) != 0;
+    }
+    if changed & (1 << 15) != 0 {
+        config.dps_show_names = value(&NAMES) != 0;
+    }
+    if changed & (1 << 16) != 0 {
+        config.dps_offset_x = value(&PANEL_X) as f32 * 5.0;
+    }
+    if changed & (1 << 17) != 0 {
+        config.dps_offset_y = value(&PANEL_Y) as f32 * 5.0;
     }
 }
 
@@ -475,6 +540,11 @@ pub fn take_save() -> bool {
 /// 动作行请求重置 DPS，返回 true 并清除标记。
 pub fn take_reset() -> bool {
     RESET.swap(false, Ordering::AcqRel)
+}
+
+/// 动作行请求恢复默认设置，返回 true 并清除标记。
+pub fn take_reset_settings() -> bool {
+    RESET_SETTINGS.swap(false, Ordering::AcqRel)
 }
 
 /// 当前是否正显示本插件的 Mod Options 页。

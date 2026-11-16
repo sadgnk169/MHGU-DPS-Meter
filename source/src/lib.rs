@@ -652,6 +652,21 @@ pub extern "C" fn forge_onUpdate(dt: f32) {
     FRAME.fetch_add(1, Ordering::Relaxed);
     let dt = if dt.is_finite() && dt > 0.0 { dt } else { 1.0 / 60.0 };
     // Purple-lib 设置页的改动在游戏更新里应用；它的 get/set 回调只读写原子变量。
+    if purple_lib::take_reset_settings() {
+        let _ = purple_lib::take_dirty();
+        let config = Config::DEFAULT;
+        MENU.with(|edit| edit.draft = config);
+        ENABLED.store(config.enabled, Ordering::Relaxed);
+        STATE.with(|state| {
+            state.clear();
+            state.config = config;
+        });
+        purple_lib::sync(&config);
+        save_config_from_menu();
+        MENU.with(|edit| {
+            edit.message = "Settings reset to defaults. Restart the game to apply."
+        });
+    }
     let changed_rows = purple_lib::take_dirty();
     if changed_rows != 0 {
         let config = MENU.with(|edit| {
@@ -912,7 +927,14 @@ fn draw_pixel_icon(
     }
 }
 fn draw_dps_curve(dps: &DpsState, config: &Config, display: DisplayArea) -> [f32; 4] {
-    let scale = display.height / 720.0;
+    // 位置按 720p 基准换算；面板大小再乘用户倍率，锚点不跟着移动。
+    let base = display.height / 720.0;
+    let user_scale = if config.dps_scale.is_finite() {
+        config.dps_scale.clamp(0.5, 3.0)
+    } else {
+        1.0
+    };
+    let scale = base * user_scale;
     let font = unsafe { CUSTOM_FONT }.unwrap_or_else(imgui::ImFont::current);
     let font_size = DPS_FONT_SIZE * scale;
     let small_font = font_size * 0.72;
@@ -1138,13 +1160,17 @@ fn draw_dps_curve(dps: &DpsState, config: &Config, display: DisplayArea) -> [f32
         + first_row_gap
         + row_h * dps.count as f32
         + team_row_h;
-    let x = (config.dps_offset_x * scale).clamp(0.0, (display.width - width).max(0.0));
-    let y = (config.dps_offset_y * scale).clamp(0.0, (display.height - height).max(0.0));
+    let x = (config.dps_offset_x * base).clamp(0.0, (display.width - width).max(0.0));
+    let y = (config.dps_offset_y * base).clamp(0.0, (display.height - height).max(0.0));
     let draw = imgui::DrawList::foreground();
     let gold = imgui::color(255, 220, 80, 255);
     let white = imgui::color(255, 255, 255, 255);
 
-    let alpha = config.dps_background_alpha.clamp(0.0, 255.0) as u8;
+    let alpha = if config.dps_show_background {
+        config.dps_background_alpha.clamp(0.0, 255.0) as u8
+    } else {
+        0
+    };
     if alpha > 0 {
         draw.add_rect_filled(
             ImVec2::new(x, y),
@@ -1724,13 +1750,11 @@ fn draw_settings() {
 }
 
 fn draw_settings_body() {
-    imgui::text_wrapped(c"Compatibility / 兼容:");
+    imgui::text_wrapped(c"Compatibility:");
     imgui::text_wrapped(c"FF14-style Damage Text v0.1.1");
     imgui::text_wrapped(c"Damage Numbers r30");
     imgui::text_wrapped(c"MHGU Attack Damage Display (tested)");
-    imgui::text_wrapped(c"本版本支持以上三款已测试组合。");
     imgui::text_wrapped(c"Only one DPS NRO. Damage Numbers and Attack Display cannot be enabled together.");
-    imgui::text_wrapped(c"只安装一个 DPS NRO；Damage Numbers 与 Attack Display 不能同时启用。");
     imgui::separator();
     if !INSTALLED.load(Ordering::Acquire) {
         imgui::text("Hook addresses did not match. See Forge log.");
@@ -1742,29 +1766,42 @@ fn draw_settings_body() {
         if imgui::button(c"Reset DPS", Default::default()) {
             DPS.with(|dps| dps.reset_now());
         }
-        imgui::text("DPS panel");
+        imgui::separator_text(c"Panel");
+        let mut scale_percent = c.dps_scale * 100.0;
+        if imgui::input_float(
+            c"Overlay scale (%)",
+            &mut scale_percent,
+            5.0,
+            10.0,
+            ImGuiInputTextFlags::None,
+        ) {
+            c.dps_scale = (scale_percent / 100.0).clamp(0.5, 3.0);
+        }
+        imgui::checkbox(c"Show background", &mut c.dps_show_background);
         plugin_config::number(
             c"DPS background alpha",
             &mut c.dps_background_alpha,
             0.0,
             255.0,
         );
+        plugin_config::number(c"Panel X", &mut c.dps_offset_x, 0.0, 1280.0);
+        plugin_config::number(c"Panel Y", &mut c.dps_offset_y, 0.0, 720.0);
+        imgui::separator_text(c"Rows");
         imgui::checkbox(c"Show timer", &mut c.dps_show_timer);
         imgui::checkbox(c"Show damage", &mut c.dps_show_damage);
         imgui::checkbox(c"Show percent", &mut c.dps_show_percent);
         imgui::checkbox(c"Show DPS", &mut c.dps_show_dps);
         imgui::checkbox(c"Show hits", &mut c.dps_show_hits);
-        plugin_config::number(c"Panel X", &mut c.dps_offset_x, 0.0, 1280.0);
-        plugin_config::number(c"Panel Y", &mut c.dps_offset_y, 0.0, 720.0);
+        imgui::checkbox(c"Weapon icons", &mut c.dps_show_weapon);
+        imgui::checkbox(c"Player names", &mut c.dps_show_names);
+        imgui::checkbox(c"Inline stats", &mut c.dps_inline_stats);
+        imgui::checkbox(c"Team summary", &mut c.dps_show_team);
+        imgui::separator_text(c"Chart");
         imgui::checkbox(c"Show chart", &mut c.dps_show_curve);
         plugin_config::number(c"Curve width", &mut c.dps_curve_width, 220.0, 600.0);
         plugin_config::number(c"Curve height", &mut c.dps_curve_height, 55.0, 200.0);
         imgui::checkbox(c"Curve fill", &mut c.dps_curve_fill);
         imgui::checkbox(c"Percent bar", &mut c.dps_show_percent_bar);
-        imgui::checkbox(c"Weapon icons", &mut c.dps_show_weapon);
-        imgui::checkbox(c"Player names", &mut c.dps_show_names);
-        imgui::checkbox(c"Inline stats", &mut c.dps_inline_stats);
-        imgui::checkbox(c"Team summary", &mut c.dps_show_team);
         let mut input = FONT_INPUT.with(|b| *b);
         if imgui::input_text(c"DPS font TTF filename", &mut input, ImGuiInputTextFlags::None) {
             FONT_INPUT.with(|b| *b = input);

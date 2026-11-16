@@ -27,6 +27,8 @@ pub struct Config {
     pub full_opacity: f32,
     pub lifetime: f32,
     pub dps_background_alpha: f32,
+    pub dps_scale: f32,
+    pub dps_show_background: bool,
     pub dps_show_timer: bool,
     pub dps_show_damage: bool,
     pub dps_show_percent: bool,
@@ -116,8 +118,10 @@ impl Config {
         )?;
         writeln!(
             out,
-            "[dps]\ndps_background_alpha = {}\ndps_show_timer = {}\ndps_show_damage = {}\ndps_show_percent = {}\ndps_show_dps = {}\ndps_show_hits = {}\ndps_offset_x = {}\ndps_offset_y = {}\ndps_show_curve = {}\ndps_curve_width = {}\ndps_curve_height = {}\ndps_curve_fill = {}\ndps_show_percent_bar = {}\ndps_show_weapon = {}\ndps_show_names = {}\ndps_inline_stats = {}\ndps_show_team = {}",
+            "[dps]\ndps_background_alpha = {}\ndps_scale = {}\ndps_show_background = {}\ndps_show_timer = {}\ndps_show_damage = {}\ndps_show_percent = {}\ndps_show_dps = {}\ndps_show_hits = {}\ndps_offset_x = {}\ndps_offset_y = {}\ndps_show_curve = {}\ndps_curve_width = {}\ndps_curve_height = {}\ndps_curve_fill = {}\ndps_show_percent_bar = {}\ndps_show_weapon = {}\ndps_show_names = {}\ndps_inline_stats = {}\ndps_show_team = {}",
             self.dps_background_alpha,
+            self.dps_scale,
+            self.dps_show_background,
             self.dps_show_timer,
             self.dps_show_damage,
             self.dps_show_percent,
@@ -148,6 +152,8 @@ impl Config {
         full_opacity: 1.10,
         lifetime: 1.40,
         dps_background_alpha: 180.0,
+        dps_scale: 1.0,
+        dps_show_background: true,
         dps_show_timer: true,
         dps_show_damage: true,
         dps_show_percent: true,
@@ -250,6 +256,10 @@ impl Config {
                     config.dps_background_alpha =
                         number(0.0, 255.0, "dps_background_alpha must be in 0..255")?
                 }
+                "dps_scale" => {
+                    config.dps_scale = number(0.5, 3.0, "dps_scale must be in 0.5..3.0")?
+                }
+                "dps_show_background" => config.dps_show_background = boolean()?,
                 "dps_show_timer" => config.dps_show_timer = boolean()?,
                 "dps_show_damage" => config.dps_show_damage = boolean()?,
                 "dps_show_percent" => config.dps_show_percent = boolean()?,

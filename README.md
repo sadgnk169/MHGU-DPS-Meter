@@ -53,7 +53,7 @@ DPS 统计可能让部分玩家感到压力或不适。联机时请尊重队友�
 
 ### Purple-lib（可选）
 
-1.3.0 起支持 [Purple-lib](https://gamebanana.com/mods/740376)：安装 Purple-lib 后，游戏开始菜单的 **Options > Mod Options** 里会出现 `MHGU DPS Meter` 页，可以直接调整 16 项常用设置（显示项、武器图标、玩家名字、图表、百分比条、面板位置、背景透明度、重置 DPS），每一行都有底部说明，改动即时生效，关闭窗口后自动写回 `mhgu_dps_meter.ini`。
+1.3.0 起支持 [Purple-lib](https://gamebanana.com/mods/740376)：安装 Purple-lib 后，游戏开始菜单的 **Options > Mod Options** 里会出现 `MHGU DPS Meter` 页，可以直接调整 20 项常用设置（显示项、武器图标、玩家名字、图表、百分比条、面板位置、面板大小、背景开关、重置 DPS、恢复默认设置），每一行都有底部说明，改动即时生效，关闭窗口后自动写回 `mhgu_dps_meter.ini`。
 
 Purple-lib 不是必需的。没有安装时插件行为与之前完全一致，Forge 设置页仍然可用。
 
@@ -73,8 +73,14 @@ enabled = true
 font_file = default
 
 [dps]
+; 是否绘制面板的黑色背景。
+dps_show_background = true
+
 ; 黑色背景透明度，0 = 完全透明，255 = 完全不透明。
 dps_background_alpha = 180.0
+
+; 面板大小倍率，0.5 = 50%，3.0 = 300%；不影响位置。
+dps_scale = 1.0
 
 ; 是否显示面板顶部的 DPS 计时。
 dps_show_timer = true
@@ -184,7 +190,7 @@ This release has a single NRO, `mhgu_dps_meter.nro`, tested with:
 
 ### Purple-lib (optional)
 
-Version 1.3.0 supports [Purple-lib](https://gamebanana.com/mods/740376). With Purple-lib installed, **Options > Mod Options** in the game's start menu gains an `MHGU DPS Meter` page with 16 common settings (display toggles, weapon icons, player names, chart, percent bar, panel position, background opacity, Reset DPS). Every row has a help-bar line, changes apply immediately, and closing the window saves them to `mhgu_dps_meter.ini`.
+Version 1.3.0 supports [Purple-lib](https://gamebanana.com/mods/740376). With Purple-lib installed, **Options > Mod Options** in the game's start menu gains an `MHGU DPS Meter` page with 20 common settings (display toggles, weapon icons, player names, chart, percent bar, panel position, overlay size, background toggle, Reset DPS, Reset settings). Every row has a help-bar line, changes apply immediately, and closing the window saves them to `mhgu_dps_meter.ini`.
 
 Purple-lib is not required. Without it the plugin behaves exactly as before and the Forge settings page still works.
 
@@ -198,7 +204,9 @@ After editing the INI manually, fully restart the game. Menu changes preview imm
 |---|---|---|
 | `enabled` | `true` | Enable damage tracking and the panel |
 | `font_file` | `default` | Bundled Noto Sans SC, or a TTF/OTF filename |
+| `dps_show_background` | `true` | Draw the panel's black background |
 | `dps_background_alpha` | `180.0` | Background opacity, 0–255 |
+| `dps_scale` | `1.0` | Panel size multiplier, 0.5–3.0; position unchanged |
 | `dps_show_timer` | `true` | Show elapsed timer |
 | `dps_show_damage` | `true` | Show total damage |
 | `dps_show_percent` | `true` | Show percentage |
