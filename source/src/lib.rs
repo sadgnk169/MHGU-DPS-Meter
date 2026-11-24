@@ -581,6 +581,32 @@ impl DpsState {
         }
     }
 
+    // 播种行是在任务刚开始那一帧建立的，此时本地玩家对象的 HUD 颜色字段可能还没
+    // 初始化，own 行会暂时显示槽位色（实测表现为自己的图标一直是黄色），直到自己
+    // 第一次命中才被 add() 改成真实颜色。0 伤害行每帧重读一次元数据：读到有效颜色
+    // 就更新，读不到就保留当前值，不会把已经正确的颜色改回槽位色。
+    fn refresh_seeded_meta(&mut self, base: u32) {
+        for index in 0..self.count {
+            let row = &mut self.owners[index];
+            if row.damage > 0 || row.owner < 0x10000 {
+                continue;
+            }
+            if let Some(color) = hud_color(row.owner) {
+                row.color = color;
+            }
+            let weapon = owner_weapon(row.owner);
+            if weapon != 0xFF {
+                row.weapon = weapon;
+            }
+            if row.name.is_empty() {
+                let name = unsafe { owner_name(base, row.owner) };
+                if !name.is_empty() {
+                    row.name = name;
+                }
+            }
+        }
+    }
+
     fn decimate_history(&mut self) {
         // 保留第一点和每个偶数点，再补上最后一点；累计伤害值不会被平均，
         // 曲线末端始终对应真实的当前总伤害。
@@ -665,24 +691,25 @@ impl DpsState {
 
 }
 
-fn owner_color(owner: u32, fallback: u8) -> u8 {
+// HUD 颜色编号：player+0x100 的 bit8..11。任务刚开始（面板播种那一帧）
+// 这个字段可能还没有写入真实颜色，读不到时返回 None，让调用者保留已有颜色
+// 或退化成槽位色；随后每帧重读，写入后立刻换成真实颜色。
+fn hud_color(owner: u32) -> Option<u8> {
     if owner < 0x10000 {
-        return if fallback < 4 { fallback } else { 0xFF };
+        return None;
     }
     let value = unsafe { read_u32(owner + 0x100) } & 0xF00;
     match value {
-        0x100 => 0,
-        0x200 => 1,
-        0x400 => 3,
-        0x800 => 2,
-        _ => {
-            if fallback < 4 {
-                fallback
-            } else {
-                0xFF
-            }
-        }
+        0x100 => Some(0),
+        0x200 => Some(1),
+        0x400 => Some(3),
+        0x800 => Some(2),
+        _ => None,
     }
+}
+
+fn owner_color(owner: u32, fallback: u8) -> u8 {
+    hud_color(owner).unwrap_or(if fallback < 4 { fallback } else { 0xFF })
 }
 
 fn owner_weapon(owner: u32) -> u8 {
@@ -957,6 +984,13 @@ pub extern "C" fn forge_onUpdate(dt: f32) {
                 if seed {
                     DPS.with(|dps| dps.seed_players(base, player));
                 }
+                // 播种时的颜色/武器/名字可能是初始化中途的值，0 伤害行持续重读，
+                // 命中前的图标颜色才会和真实 HUD 颜色一致。
+                DPS.with(|dps| {
+                    if dps.count != 0 && !dps.finished {
+                        dps.refresh_seeded_meta(base);
+                    }
+                });
             }
         }
     }
@@ -1493,6 +1527,10 @@ fn draw_dps_curve(dps: &DpsState, config: &Config, display: DisplayArea) -> [f32
     if config.dps_curve_fill {
         for (row_index, row) in rows[..dps.count].iter().enumerate() {
             let color_index = row_color(row, row_index);
+            if !row_has_damage(dps, color_index) {
+                continue;
+            }
+            let point_count = dps.history_len;
             let mut points: [ImVec2; HISTORY_CAP] =
                 core::array::from_fn(|_| ImVec2::new(0.0, 0.0));
             for index in 0..dps.history_len {
@@ -1508,11 +1546,11 @@ fn draw_dps_curve(dps: &DpsState, config: &Config, display: DisplayArea) -> [f32
                 let py = chart_bottom - value.clamp(0.0, 1.0) * chart_height;
                 points[index] = ImVec2::new(px, py);
             }
-            let point_count = dps.history_len;
             if point_count > 1 {
                 let fill = dps_color(color_index, 55);
                 let step = 1.0 * scale;
                 let right = chart_left + chart_width;
+                // 填充也从最左端开始，命中前那段高度为 0，相当于不铺底色。
                 let mut column = chart_left;
                 let mut segment = 1usize;
                 while column < right {
@@ -1550,6 +1588,10 @@ fn draw_dps_curve(dps: &DpsState, config: &Config, display: DisplayArea) -> [f32
 
     for (row_index, row) in rows[..dps.count].iter().enumerate() {
         let color_index = row_color(row, row_index);
+        if !row_has_damage(dps, color_index) {
+            continue;
+        }
+        let point_count = dps.history_len;
         let mut points: [ImVec2; HISTORY_CAP] =
             core::array::from_fn(|_| ImVec2::new(0.0, 0.0));
         for index in 0..dps.history_len {
@@ -1565,7 +1607,6 @@ fn draw_dps_curve(dps: &DpsState, config: &Config, display: DisplayArea) -> [f32
             let py = chart_bottom - value.clamp(0.0, 1.0) * chart_height;
             points[index] = ImVec2::new(px, py);
         }
-        let point_count = dps.history_len;
         let color = dps_color(color_index, 230);
         if point_count > 1 {
             draw.add_polyline(
@@ -1883,6 +1924,21 @@ fn draw_dps_curve(dps: &DpsState, config: &Config, display: DisplayArea) -> [f32
 
 fn history_start(_dps: &DpsState) -> usize {
     0
+}
+
+// 这一行整局是否造成过伤害（历史采样里出现过正累计伤害）。
+// 任务开始模式会在首次命中前先播种 0 伤害行，这些行只显示图标/名字/0 伤害，
+// 不画曲线：队友先命中时自己那一行也不会出现贴底的假曲线。
+// 一旦有了伤害就按整段时间轴从最左端画起，前面那段 0 伤害平直延伸，
+// 后出手的玩家不会在自己的曲线前面留空缺。
+fn row_has_damage(dps: &DpsState, color_index: usize) -> bool {
+    let start = history_start(dps);
+    for index in 0..dps.history_len {
+        if dps.history[(start + index) % HISTORY_CAP].damage[color_index] > 0 {
+            return true;
+        }
+    }
+    false
 }
 
 fn draw_dps() {

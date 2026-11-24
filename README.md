@@ -52,6 +52,9 @@ DPS 统计可能让部分玩家感到压力或不适。联机时请尊重队友�
   面板一进任务就显示，用时与游戏右上角任务倒计时一致（含接任务后的赶路时间）；
   在设置页取消 `Start timer at quest start`（或 Purple-lib 第 3 页把“计时起点”设为“首次命中”）
   则改为第一次命中后计时，DPS 按命中后的时间计算，且**游戏暂停时计时一起暂停、恢复后继续**；
+- **联机时的行颜色与曲线**：每名玩家的武器图标和曲线颜色按各自的 HUD 颜色显示；
+  任务开始模式下玩家行一进任务就以 0 伤害列出，**整局没有造成过伤害的玩家不画曲线**；
+  后出手的玩家曲线从图表最左端连续画出（命中前是贴底的 0 伤害段），不会在前面留空缺；
 - 单人任务也会显示；两名及以上玩家时显示底部全队统计；
 - 关闭统计：在 Forge 菜单取消 `Enable DPS meter`，或把 INI 的 `enabled` 改为 `false`；
 - 重置本轮数据：使用 Forge 菜单中的 `Reset DPS`。
@@ -195,6 +198,7 @@ This release has a single NRO, `mhgu_dps_meter.nro`, tested with:
 - Area changes keep DPS totals;  Data clears about 60 frames (roughly 1–2 seconds depending on frame rate) after the save/result screen appears.
 - **Quest-end freeze**: when the quest ends (clear, fail, or time up), the timer, damage, hits, DPS and chart all stop at the end moment and stay visible until the result screen clears them.
 - **Timer start option**: timing starts at quest start by default (`dps_timer_from_quest_start = true`); the panel appears as soon as you enter the quest and matches the in-game quest countdown (including travel time). Turn off `Start timer at quest start` (or set Purple-lib's "Timer start" row to "First hit") to time from the first hit instead; DPS is then computed from the first-hit time and the timer also pauses while the game is paused.
+- **Row colors and chart in multiplayer**: each player's weapon icon and chart line use that player's own HUD color. In quest-start mode every player row is listed at 0 damage as soon as the quest begins, players who never dealt damage draw no chart line, and a player who starts attacking later gets a continuous line from the left edge of the chart (flat at 0 damage before their first hit) instead of a gap.
 - Single-player quests are supported; the team summary appears with two or more players.
 - To disable the overlay, turn off `Enable DPS meter` or set `enabled = false` in the INI.
 - To reset the current run, use `Reset DPS` in the Forge menu.
