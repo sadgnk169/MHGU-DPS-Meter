@@ -23,10 +23,10 @@ const ROW_ACTION: u32 = 3;
 /// 数字行不在首尾回绕。
 const ROW_NO_WRAP: u32 = 1;
 
-/// 本页总行数（3 页：8 + 8 + 4）。
-const ROW_COUNT: u32 = 20;
-const RESET_DPS_ROW: u32 = 18;
-const RESET_SETTINGS_ROW: u32 = 19;
+/// 本页总行数（3 页：8 + 8 + 5）。
+const ROW_COUNT: u32 = 21;
+const RESET_DPS_ROW: u32 = 19;
+const RESET_SETTINGS_ROW: u32 = 20;
 
 #[repr(C)]
 pub struct OptionRow {
@@ -97,6 +97,11 @@ static OFF_ON: Labels = Labels([c"Off".as_ptr(), c"On".as_ptr()]);
 static OFF_ON_HANS: Labels = Labels([c"关闭".as_ptr(), c"开启".as_ptr()]);
 static OFF_ON_HANT: Labels = Labels([c"關閉".as_ptr(), c"開啟".as_ptr()]);
 
+// 计时起点：0 = 第一次命中，1 = 任务开始（默认）。
+static TIMER_START_EN: Labels = Labels([c"First hit".as_ptr(), c"Quest start".as_ptr()]);
+static TIMER_START_HANS: Labels = Labels([c"首次命中".as_ptr(), c"任务开始".as_ptr()]);
+static TIMER_START_HANT: Labels = Labels([c"首次命中".as_ptr(), c"任務開始".as_ptr()]);
+
 struct ActionLabel([*const c_char; 1]);
 // SAFETY: 同上。
 unsafe impl Sync for ActionLabel {}
@@ -127,6 +132,7 @@ static NAMES_EN: [&core::ffi::CStr; ROW_COUNT as usize] = [
     c"Player names",
     c"Panel X",
     c"Panel Y",
+    c"Timer start",
     c"Reset DPS",
     c"Reset settings",
 ];
@@ -149,6 +155,7 @@ static NAMES_HANS: [&core::ffi::CStr; ROW_COUNT as usize] = [
     c"玩家名字",
     c"面板 X",
     c"面板 Y",
+    c"计时起点",
     c"重置 DPS",
     c"恢复默认设置",
 ];
@@ -171,6 +178,7 @@ static NAMES_HANT: [&core::ffi::CStr; ROW_COUNT as usize] = [
     c"玩家名稱",
     c"面板 X",
     c"面板 Y",
+    c"計時起點",
     c"重設 DPS",
     c"恢復預設設定",
 ];
@@ -194,6 +202,7 @@ static HELP_EN: [Option<&core::ffi::CStr>; ROW_COUNT as usize] = [
     Some(c"Show hunter names instead of colours only."),
     Some(c"Moves the panel right in steps of 5 pixels."),
     Some(c"Moves the panel down in steps of 5 pixels."),
+    Some(c"Start timing at quest start or on the first hit."),
     Some(c"Clear the current DPS totals and chart."),
     Some(c"Reset every setting to its default and save."),
 ];
@@ -216,6 +225,7 @@ static HELP_HANS: [Option<&core::ffi::CStr>; ROW_COUNT as usize] = [
     Some(c"显示猎人名字，而不只是颜色。"),
     Some(c"以 5 像素为一步右移面板。"),
     Some(c"以 5 像素为一步下移面板。"),
+    Some(c"从任务开始计时（含赶路），或从第一次命中开始计时。"),
     Some(c"清空当前 DPS 累计和图表。"),
     Some(c"恢复所有设置为默认值并保存。"),
 ];
@@ -238,12 +248,14 @@ static HELP_HANT: [Option<&core::ffi::CStr>; ROW_COUNT as usize] = [
     Some(c"顯示獵人名稱，而不只是顏色。"),
     Some(c"以 5 像素為一步右移面板。"),
     Some(c"以 5 像素為一步下移面板。"),
+    Some(c"從任務開始計時（含趕路），或從第一次命中開始計時。"),
     Some(c"清空目前 DPS 累計和圖表。"),
     Some(c"恢復所有設定為預設值並保存。"),
 ];
 
 static ENABLED: AtomicU32 = AtomicU32::new(1);
 static TIMER: AtomicU32 = AtomicU32::new(1);
+static TIMER_START: AtomicU32 = AtomicU32::new(1);
 static DAMAGE: AtomicU32 = AtomicU32::new(1);
 static PERCENT: AtomicU32 = AtomicU32::new(1);
 static SHOW_DPS: AtomicU32 = AtomicU32::new(1);
@@ -281,6 +293,7 @@ static SETTINGS: [&AtomicU32; ROW_COUNT as usize] = [
     &NAMES,
     &PANEL_X,
     &PANEL_Y,
+    &TIMER_START,
     &DUMMY,
     &DUMMY,
 ];
@@ -345,7 +358,18 @@ extern "C" fn row(_: *mut c_void, language: u32, index: u32, out: *mut OptionRow
         16 => number_row(out, name.as_ptr(), 257, 0, 5),
         // 0..=720，每档 5px。
         17 => number_row(out, name.as_ptr(), 145, 0, 5),
+        // 0 = 第一次命中，1 = 任务开始。
         18 => {
+            let labels = match lang {
+                Lang::Hans => &TIMER_START_HANS,
+                Lang::Hant => &TIMER_START_HANT,
+                Lang::En => &TIMER_START_EN,
+            };
+            out.kind = ROW_LABELS;
+            out.labels = labels.0.as_ptr();
+            out.label_count = 2;
+        }
+        19 => {
             let label = match lang {
                 Lang::Hans => &RESET_DPS_HANS,
                 Lang::Hant => &RESET_DPS_HANT,
@@ -355,7 +379,7 @@ extern "C" fn row(_: *mut c_void, language: u32, index: u32, out: *mut OptionRow
             out.labels = label.0.as_ptr();
             out.label_count = 1;
         }
-        19 => {
+        20 => {
             let label = match lang {
                 Lang::Hans => &RESET_ALL_HANS,
                 Lang::Hant => &RESET_ALL_HANT,
@@ -431,6 +455,7 @@ fn store(config: &Config) {
     let flags = |value: bool| if value { 1 } else { 0 };
     ENABLED.store(flags(config.enabled), Ordering::Relaxed);
     TIMER.store(flags(config.dps_show_timer), Ordering::Relaxed);
+    TIMER_START.store(flags(config.dps_timer_from_quest_start), Ordering::Relaxed);
     DAMAGE.store(flags(config.dps_show_damage), Ordering::Relaxed);
     PERCENT.store(flags(config.dps_show_percent), Ordering::Relaxed);
     SHOW_DPS.store(flags(config.dps_show_dps), Ordering::Relaxed);
@@ -524,6 +549,9 @@ pub fn apply(config: &mut Config, changed: u32) {
     }
     if changed & (1 << 17) != 0 {
         config.dps_offset_y = value(&PANEL_Y) as f32 * 5.0;
+    }
+    if changed & (1 << 18) != 0 {
+        config.dps_timer_from_quest_start = value(&TIMER_START) != 0;
     }
 }
 

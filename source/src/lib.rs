@@ -267,6 +267,29 @@ impl HistorySample {
     };
 }
 
+// 当前任务对象指针（main+0x0188AD90）与任务相位（+0x50）。
+// 1.4.0 实机偏移，与 quest-slowmo 一致：2 = 任务进行中，3..=9 为各种结束/结算状态。
+// 任务结束后游戏自身的计时会停住，插件据此把本局数据整块冻结。
+const QUEST_POINTER_OFFSET: u32 = 0x0188_AD90;
+const QUEST_PHASE_OFFSET: u32 = 0x50;
+const QUEST_PHASE_IN_PROGRESS: u8 = 2;
+const QUEST_PHASE_END_MIN: u8 = 3;
+const QUEST_PHASE_END_MAX: u8 = 9;
+
+// 任务剩余时间：任务更新函数（main+0x3A00C8）每帧递减 +0x1C，单位是 1/60 秒
+// （实测 50 分钟任务开局为 180000 = 3000s×60，每秒约减 60）；结算时也把 +0x1C
+// 当“剩余时间”传给任务结果函数；+0x55 是子相位（0 = 正式狩猎）。
+const QUEST_REMAINING_OFFSET: u32 = 0x1C;
+const QUEST_SUBPHASE_OFFSET: u32 = 0x55;
+/// 1/60 秒刻度下的合理上限（24 小时）。
+const QUEST_REMAINING_LIMIT: u32 = 24 * 3600 * 60;
+const QUEST_TICKS_PER_MINUTE: f32 = 60.0 * 60.0;
+const QUEST_TICKS_PER_SECOND: f32 = 60.0;
+const QUEST_TIME_LIMIT: f32 = 24.0 * 3600.0;
+
+// 玩家管理器指针（main+0x01885B58），+0x1C 起是 4 名玩家的对象指针。
+const PLAYER_MANAGER_OFFSET: u32 = 0x0188_5B58;
+
 #[derive(Clone, Copy)]
 struct DpsState {
     owners: [OwnerDps; 4],
@@ -276,6 +299,28 @@ struct DpsState {
     active: bool,
     visible: bool,
     in_quest: bool,
+    // 当前任务实例指针；换新任务时重置赛季标志。
+    quest: u32,
+    // 本局已经见过“任务进行中”相位。
+    quest_started: bool,
+    // 本局计时是否已经启动（任务开始或第一次命中，取决于设置）。
+    timer_running: bool,
+    // 本局是否用游戏任务时钟计时。时钟单位是 1/60 秒：
+    //   clock_from_start = true  → 用时 = 本局总时限 − 当前剩余（任务开始模式）；
+    //   clock_from_start = false → 用时 = 首次命中时剩余 − 当前剩余（首次命中模式，
+    //                             游戏暂停时倒计时停住，计时也会跟着暂停）。
+    clock_timed: bool,
+    clock_from_start: bool,
+    clock_available: bool,
+    // 本局观测到的最大剩余刻度（即任务总时限）。
+    clock_limit: f32,
+    // 计时基准刻度（首次命中模式下是命中瞬间的剩余刻度）。
+    clock_base: f32,
+    clock_last: f32,
+    // 仅用于诊断日志：插件自己的帧累加用时，和游戏时钟对照。
+    frame_elapsed: f32,
+    // 任务已结束：用时、伤害、命中、曲线和 DPS 全部停在结束那一帧。
+    finished: bool,
     result_frames: u32,
     history: [HistorySample; HISTORY_CAP],
     history_len: usize,
@@ -292,6 +337,17 @@ impl DpsState {
             active: false,
             visible: true,
             in_quest: false,
+            quest: 0,
+            quest_started: false,
+            timer_running: false,
+            clock_timed: false,
+            clock_from_start: false,
+            clock_available: false,
+            clock_limit: 0.0,
+            clock_base: 0.0,
+            clock_last: 0.0,
+            frame_elapsed: 0.0,
+            finished: false,
             result_frames: 0,
             history: [HistorySample::EMPTY; HISTORY_CAP],
             history_len: 0,
@@ -305,6 +361,17 @@ impl DpsState {
         self.total = 0;
         self.elapsed = 0.0;
         self.active = false;
+        self.quest = 0;
+        self.quest_started = false;
+        self.timer_running = false;
+        self.clock_timed = false;
+        self.clock_from_start = false;
+        self.clock_available = false;
+        self.clock_limit = 0.0;
+        self.clock_base = 0.0;
+        self.clock_last = 0.0;
+        self.frame_elapsed = 0.0;
+        self.finished = false;
         self.history = [HistorySample::EMPTY; HISTORY_CAP];
         self.history_len = 0;
         self.last_sample = 0.0;
@@ -312,6 +379,80 @@ impl DpsState {
 
     fn reset_now(&mut self) {
         self.reset();
+    }
+
+    // 每帧在游戏更新里读取任务相位。任务进行中记下本局已开始；
+    // 相位离开 2 且落在结束区间时整块冻结，正好对应游戏任务计时的停止时刻。
+    // 新任务实例出现（指针变化）时清掉上一局的冻结标志，避免卡死。
+    // from_quest_start = true 时，看到“任务进行中”就从 0 开始计时；
+    // false 时保持旧行为，等 add() 收到第一次命中后才启动计时。
+    fn observe_quest(
+        &mut self,
+        quest: u32,
+        phase: u8,
+        subphase: u8,
+        remaining: Option<f32>,
+        from_quest_start: bool,
+    ) {
+        if quest >= 0x10000 && quest != self.quest {
+            self.quest = quest;
+            self.quest_started = false;
+            self.timer_running = false;
+            self.clock_timed = false;
+            self.clock_from_start = false;
+            self.clock_available = false;
+            self.clock_limit = 0.0;
+            self.clock_base = 0.0;
+            self.clock_last = 0.0;
+            self.finished = false;
+        }
+        if let Some(remaining) = remaining {
+            self.clock_available = true;
+            self.clock_last = remaining;
+            // 剩余时间只会减少；持续取最大值可还原任务总时限。
+            self.clock_limit = self.clock_limit.max(remaining);
+            if self.clock_from_start {
+                self.clock_timed = true;
+            }
+        }
+        if phase == QUEST_PHASE_IN_PROGRESS {
+            self.quest_started = true;
+            if from_quest_start && !self.active {
+                // 进任务就先显示面板；等游戏倒计时真正开始才走表
+                // （读到剩余时间，或子相位进入 0 = 正式狩猎）。
+                self.in_quest = true;
+                if !self.timer_running && (self.clock_available || subphase == 0) {
+                    self.timer_running = true;
+                    self.clock_from_start = true;
+                    self.clock_timed = self.clock_available;
+                    info!(
+                        "mhgu-dps-meter: quest timer started; source = {} (remaining {:.1}s, limit {:.1}s, subphase {})",
+                        if self.clock_timed {
+                            "game quest timer"
+                        } else {
+                            "plugin frame time"
+                        },
+                        self.clock_last / QUEST_TICKS_PER_SECOND,
+                        quest_limit_ticks(self.clock_limit) / QUEST_TICKS_PER_SECOND,
+                        subphase
+                    );
+                }
+            }
+        } else if self.quest_started
+            && (QUEST_PHASE_END_MIN..=QUEST_PHASE_END_MAX).contains(&phase)
+            && !self.finished
+        {
+            self.finished = true;
+            info!(
+                "mhgu-dps-meter: quest ended at phase {} subphase {}; panel frozen at {:.2}s (remaining {:.1}s, limit {:.1}s, frame clock {:.2}s)",
+                phase,
+                subphase,
+                self.elapsed,
+                self.clock_last / QUEST_TICKS_PER_SECOND,
+                quest_limit_ticks(self.clock_limit) / QUEST_TICKS_PER_SECOND,
+                self.frame_elapsed
+            );
+        }
     }
 
 
@@ -332,13 +473,26 @@ impl DpsState {
         }
     }
 
-    fn add(&mut self, owner: u32, local: bool, damage: i32, player_slot: u8) {
-        if damage <= 0 {
-            return;
+    // 返回本次命中是否计入；任务结束冻结后不再累计伤害和命中。
+    fn add(&mut self, owner: u32, local: bool, damage: i32, player_slot: u8) -> bool {
+        if damage <= 0 || self.finished {
+            return false;
         }
         if !self.in_quest {
             self.reset();
             self.in_quest = true;
+        }
+        if !self.timer_running {
+            // 首次命中模式：第一次命中才开始计时；基准取命中瞬间的游戏剩余刻度，
+            // 这样游戏暂停时任务倒计时停住，插件计时也会跟着暂停。
+            self.timer_running = true;
+            self.clock_from_start = false;
+            let remaining = f32::from_bits(QUEST_REMAINING_NOW.load(Ordering::Relaxed));
+            if remaining.is_finite() && remaining > 0.0 {
+                self.clock_timed = true;
+                self.clock_available = true;
+                self.clock_base = remaining;
+            }
         }
         let index = if player_slot < 4 {
             self.owners[..self.count]
@@ -353,7 +507,7 @@ impl DpsState {
             Some(index) => index,
             None => {
                 if self.count >= self.owners.len() {
-                    return;
+                    return false;
                 }
                 self.owners[self.count] = OwnerDps {
                     owner,
@@ -392,6 +546,39 @@ impl DpsState {
         }
         self.total = self.total.saturating_add(damage as u64);
         self.active = true;
+        true
+    }
+
+    // 任务开始计时模式下，任务一开始就把当前任务里的玩家播种成 0 伤害的行，
+    // 让面板立刻显示玩家行；伤害随命中累计。只在还没有任何伤害时调用。
+    fn seed_players(&mut self, base: u32, local: u32) {
+        if self.active || self.count != 0 {
+            return;
+        }
+        let manager = unsafe { read_u32(base + PLAYER_MANAGER_OFFSET) };
+        if manager < 0x10000 {
+            return;
+        }
+        for slot in 0..4u32 {
+            let owner = unsafe { read_u32(manager + 0x1C + slot * 4) };
+            if owner < 0x10000 || self.owners[..self.count].iter().any(|row| row.owner == owner) {
+                continue;
+            }
+            if self.count >= self.owners.len() {
+                return;
+            }
+            self.owners[self.count] = OwnerDps {
+                owner,
+                local: owner == local,
+                damage: 0,
+                hits: 0,
+                slot: slot as u8,
+                color: owner_color(owner, slot as u8),
+                weapon: owner_weapon(owner),
+                name: unsafe { owner_name(base, owner) },
+            };
+            self.count += 1;
+        }
     }
 
     fn decimate_history(&mut self) {
@@ -412,11 +599,48 @@ impl DpsState {
         self.history_len = target;
     }
 
-    fn tick(&mut self, dt: f32) {
-        if !self.active || !self.in_quest {
+    fn tick(&mut self, dt: f32, remaining: Option<f32>) {
+        if !self.in_quest || self.finished {
             return;
         }
-        self.elapsed += if dt.is_finite() && dt > 0.0 { dt } else { 1.0 / 60.0 };
+        if !self.timer_running {
+            // 首次命中模式：等本轮第一次伤害入账后再开始计时。
+            // 任务开始模式的 timer_running 已在 observe_quest 里置位。
+            if !self.active {
+                return;
+            }
+            self.timer_running = true;
+        }
+        let valid_dt = if dt.is_finite() && dt > 0.0 {
+            dt
+        } else {
+            1.0 / 60.0
+        };
+        let mut used_clock = false;
+        if self.clock_timed {
+            if let Some(remaining) = remaining {
+                self.clock_last = remaining;
+                self.clock_limit = self.clock_limit.max(remaining);
+                let base = if self.clock_from_start {
+                    quest_limit_ticks(self.clock_limit)
+                } else {
+                    self.clock_base
+                };
+                let value = ((base - remaining) / QUEST_TICKS_PER_SECOND).max(0.0);
+                if value.is_finite() && value <= QUEST_TIME_LIMIT {
+                    self.elapsed = value;
+                    used_clock = true;
+                }
+            }
+        }
+        if !used_clock {
+            self.elapsed += valid_dt;
+        }
+        self.frame_elapsed += valid_dt;
+        // 命中前只走计时，不记录曲线；第一次命中后曲线从命中时刻开始。
+        if !self.active {
+            return;
+        }
         if self.history_len == 0 || self.elapsed - self.last_sample >= SAMPLE_INTERVAL {
             let mut damage = [0u32; 4];
             for i in 0..self.count {
@@ -561,6 +785,8 @@ const DPS_FONT_SIZE: f32 = 19.0;
 const PALICO_ICON: usize = 15;
 const PALICO_ICON_LIFT: f32 = 2.0;
 static FRAME: AtomicU32 = AtomicU32::new(0);
+// 任务剩余秒数（f32 位模式）；u32::MAX 的位模式是 NaN，表示本帧读不到。
+static QUEST_REMAINING_NOW: AtomicU32 = AtomicU32::new(u32::MAX);
 static HOOK_ATTEMPTED: AtomicBool = AtomicBool::new(false);
 static SETTINGS_OPEN: AtomicBool = AtomicBool::new(false);
 
@@ -590,6 +816,7 @@ fn main() {
     set_font_input(config);
     STATE.with(|state| state.config = config);
     ENABLED.store(config.enabled, Ordering::Relaxed);
+    TIMER_FROM_QUEST_START.store(config.dps_timer_from_quest_start, Ordering::Relaxed);
     purple_lib::init(&config);
     // Install after all plugins' forge_onInit so Damage Numbers can install first.
     info!(
@@ -657,6 +884,7 @@ pub extern "C" fn forge_onUpdate(dt: f32) {
         let config = Config::DEFAULT;
         MENU.with(|edit| edit.draft = config);
         ENABLED.store(config.enabled, Ordering::Relaxed);
+        TIMER_FROM_QUEST_START.store(config.dps_timer_from_quest_start, Ordering::Relaxed);
         STATE.with(|state| {
             state.clear();
             state.config = config;
@@ -674,6 +902,7 @@ pub extern "C" fn forge_onUpdate(dt: f32) {
             edit.draft
         });
         let changed = ENABLED.swap(config.enabled, Ordering::Relaxed) != config.enabled;
+        TIMER_FROM_QUEST_START.store(config.dps_timer_from_quest_start, Ordering::Relaxed);
         STATE.with(|state| {
             if changed {
                 state.clear();
@@ -708,6 +937,29 @@ pub extern "C" fn forge_onUpdate(dt: f32) {
     }
     let mut snapshot = STATE.with(|state| state.snapshot());
     let player = unsafe { local_player(base) };
+    if INSTALLED.load(Ordering::Acquire) && player >= 0x10000 {
+        let (quest, phase, subphase, remaining) = unsafe { quest_state(base) };
+        QUEST_REMAINING_NOW.store(remaining.map_or(u32::MAX, f32::to_bits), Ordering::Relaxed);
+        if ENABLED.load(Ordering::Relaxed) {
+            let from_quest_start = TIMER_FROM_QUEST_START.load(Ordering::Relaxed);
+            DPS.with(|dps| {
+                dps.observe_quest(quest, phase, subphase, remaining, from_quest_start)
+            });
+            if from_quest_start {
+                // 任务开始模式：面板一出现就要有玩家行，先按任务里的玩家播种。
+                let seed = DPS.with(|dps| {
+                    dps.quest_started
+                        && dps.in_quest
+                        && !dps.finished
+                        && !dps.active
+                        && dps.count == 0
+                });
+                if seed {
+                    DPS.with(|dps| dps.seed_players(base, player));
+                }
+            }
+        }
+    }
     DPS.with(|dps| dps.on_result_screen(player < 0x10000));
     // Quest/room transitions flush even when the last damage number has already expired.
     if player >= 0x10000
@@ -746,7 +998,15 @@ fn draw_damage() {
     } else {
         1.0 / 60.0
     };
-    DPS.with(|dps| dps.tick(seconds));
+    DPS.with(|dps| {
+        let remaining = f32::from_bits(QUEST_REMAINING_NOW.load(Ordering::Relaxed));
+        let remaining = if remaining.is_finite() {
+            Some(remaining)
+        } else {
+            None
+        };
+        dps.tick(seconds, remaining)
+    });
     let snapshot = STATE.with(|state| state.advance(seconds));
     if !SHOW_LOCAL_NUMBERS {
         draw_dps();
@@ -1228,6 +1488,8 @@ fn draw_dps_curve(dps: &DpsState, config: &Config, display: DisplayArea) -> [f32
         0.0
     };
     let time_span = (last_time - first_time).max(1.0);
+    // 有伤害后才画曲线；任务开始模式在第一次命中前只显示空网格和玩家行。
+    if dps.active {
     if config.dps_curve_fill {
         for (row_index, row) in rows[..dps.count].iter().enumerate() {
             let color_index = row_color(row, row_index);
@@ -1315,6 +1577,7 @@ fn draw_dps_curve(dps: &DpsState, config: &Config, display: DisplayArea) -> [f32
         } else if point_count == 1 {
             draw.add_circle_filled(points[0], 2.0 * scale, color, 12);
         }
+    }
     }
 
     }
@@ -1624,7 +1887,12 @@ fn history_start(_dps: &DpsState) -> usize {
 
 fn draw_dps() {
     let dps = DPS.with(|state| *state);
-    if !dps.visible || !dps.active || dps.total == 0 || dps.count == 0 {
+    // 任务开始计时模式：一进任务就显示面板，先只有计时，伤害行随命中出现。
+    let quest_start_panel = TIMER_FROM_QUEST_START.load(Ordering::Relaxed)
+        && dps.quest_started
+        && dps.in_quest
+        && !dps.finished;
+    if !dps.visible || (!dps.active && !quest_start_panel) {
         if preview_requested() {
             draw_preview();
         }
@@ -1788,6 +2056,10 @@ fn draw_settings_body() {
         plugin_config::number(c"Panel Y", &mut c.dps_offset_y, 0.0, 720.0);
         imgui::separator_text(c"Rows");
         imgui::checkbox(c"Show timer", &mut c.dps_show_timer);
+        imgui::checkbox(
+            c"Start timer at quest start",
+            &mut c.dps_timer_from_quest_start,
+        );
         imgui::checkbox(c"Show damage", &mut c.dps_show_damage);
         imgui::checkbox(c"Show percent", &mut c.dps_show_percent);
         imgui::checkbox(c"Show DPS", &mut c.dps_show_dps);
@@ -1838,6 +2110,7 @@ fn draw_settings_body() {
         }
         let config = edit.draft;
         let changed = ENABLED.swap(config.enabled, Ordering::Relaxed) != config.enabled;
+        TIMER_FROM_QUEST_START.store(config.dps_timer_from_quest_start, Ordering::Relaxed);
         STATE.with(|state| {
             if changed {
                 state.clear();
@@ -1897,6 +2170,39 @@ fn thread_key() -> u32 {
 unsafe fn local_player(base: u32) -> u32 {
     let get: unsafe extern "C" fn(u32) -> u32 = unsafe { mem::transmute(base + 0x00276278) };
     unsafe { get(read_u32(base + 0x01885B58)) }
+}
+
+// 当前任务对象指针、相位、子相位和剩余刻度；不在任务中或指针无效时指针为 0。
+unsafe fn quest_state(base: u32) -> (u32, u8, u8, Option<f32>) {
+    let quest = unsafe { read_u32(base + QUEST_POINTER_OFFSET) };
+    if quest < 0x10000 {
+        return (0, 0xFF, 0, None);
+    }
+    let phase = unsafe { read_u8(quest + QUEST_PHASE_OFFSET) };
+    let subphase = unsafe { read_u8(quest + QUEST_SUBPHASE_OFFSET) };
+    let raw = unsafe { read_u32(quest + QUEST_REMAINING_OFFSET) };
+    // 剩余时间以 1/60 秒为单位；0 表示没有倒计时（视为读不到）。
+    let remaining = if raw > 0 && raw <= QUEST_REMAINING_LIMIT {
+        Some(raw as f32)
+    } else {
+        None
+    };
+    (quest, phase, subphase, remaining)
+}
+
+/// 把观测到的最大剩余刻度向上取整到整分钟，得到任务总时限。
+fn quest_limit_ticks(max_ticks: f32) -> f32 {
+    if !max_ticks.is_finite() || max_ticks <= 0.0 {
+        return 0.0;
+    }
+    // no_std 没有 f32::ceil，手动向上取整到整分钟。
+    let minutes = (max_ticks / QUEST_TICKS_PER_MINUTE) as i64;
+    let rounded = if (minutes as f32) * QUEST_TICKS_PER_MINUTE < max_ticks {
+        minutes + 1
+    } else {
+        minutes
+    };
+    rounded as f32 * QUEST_TICKS_PER_MINUTE
 }
 
 unsafe fn epoch(player: u32) -> Epoch {
@@ -2170,8 +2476,11 @@ unsafe extern "C" fn damage(monster: u32, slot: u32, raw: i32, mode: i32) -> i32
         if let Some(contact) = contact {
             if contact.log && contact.monster == monster && contact.slot == slot {
                 DEBUG_LOG.with(|log| log.hit(&contact, result, raw, mode));
-                DPS.with(|dps| dps.add(contact.owner, contact.local, result, contact.player_slot));
-                if contact.local {
+                // 任务结束冻结后，命中不再计入，也不再生成浮动伤害数字。
+                let accepted = DPS.with(|dps| {
+                    dps.add(contact.owner, contact.local, result, contact.player_slot)
+                });
+                if accepted && contact.local {
                     let yellow =
                         unsafe { damage_is_yellow(GAME_BASE.load(Ordering::Relaxed), contact) };
                     STATE.with(|state| {

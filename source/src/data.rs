@@ -30,6 +30,8 @@ pub struct Config {
     pub dps_scale: f32,
     pub dps_show_background: bool,
     pub dps_show_timer: bool,
+    /// true = 从任务开始计时；false = 从第一次命中开始计时（旧行为）。
+    pub dps_timer_from_quest_start: bool,
     pub dps_show_damage: bool,
     pub dps_show_percent: bool,
     pub dps_show_dps: bool,
@@ -118,11 +120,12 @@ impl Config {
         )?;
         writeln!(
             out,
-            "[dps]\ndps_background_alpha = {}\ndps_scale = {}\ndps_show_background = {}\ndps_show_timer = {}\ndps_show_damage = {}\ndps_show_percent = {}\ndps_show_dps = {}\ndps_show_hits = {}\ndps_offset_x = {}\ndps_offset_y = {}\ndps_show_curve = {}\ndps_curve_width = {}\ndps_curve_height = {}\ndps_curve_fill = {}\ndps_show_percent_bar = {}\ndps_show_weapon = {}\ndps_show_names = {}\ndps_inline_stats = {}\ndps_show_team = {}",
+            "[dps]\ndps_background_alpha = {}\ndps_scale = {}\ndps_show_background = {}\ndps_show_timer = {}\ndps_timer_from_quest_start = {}\ndps_show_damage = {}\ndps_show_percent = {}\ndps_show_dps = {}\ndps_show_hits = {}\ndps_offset_x = {}\ndps_offset_y = {}\ndps_show_curve = {}\ndps_curve_width = {}\ndps_curve_height = {}\ndps_curve_fill = {}\ndps_show_percent_bar = {}\ndps_show_weapon = {}\ndps_show_names = {}\ndps_inline_stats = {}\ndps_show_team = {}",
             self.dps_background_alpha,
             self.dps_scale,
             self.dps_show_background,
             self.dps_show_timer,
+            self.dps_timer_from_quest_start,
             self.dps_show_damage,
             self.dps_show_percent,
             self.dps_show_dps,
@@ -155,6 +158,7 @@ impl Config {
         dps_scale: 1.0,
         dps_show_background: true,
         dps_show_timer: true,
+        dps_timer_from_quest_start: true,
         dps_show_damage: true,
         dps_show_percent: true,
         dps_show_dps: true,
@@ -261,6 +265,9 @@ impl Config {
                 }
                 "dps_show_background" => config.dps_show_background = boolean()?,
                 "dps_show_timer" => config.dps_show_timer = boolean()?,
+                "dps_timer_from_quest_start" => {
+                    config.dps_timer_from_quest_start = boolean()?
+                }
                 "dps_show_damage" => config.dps_show_damage = boolean()?,
                 "dps_show_percent" => config.dps_show_percent = boolean()?,
                 "dps_show_dps" => config.dps_show_dps = boolean()?,
@@ -664,6 +671,8 @@ const _: () = assert!(core::mem::size_of::<RuntimeHook>() == 76);
 
 pub(crate) static GAME_BASE: AtomicU32 = AtomicU32::new(0);
 pub(crate) static ENABLED: AtomicBool = AtomicBool::new(false);
+/// 计时起点：false = 第一次命中，true = 任务开始。
+pub(crate) static TIMER_FROM_QUEST_START: AtomicBool = AtomicBool::new(false);
 pub(crate) static INSTALLED: AtomicBool = AtomicBool::new(false);
 pub(crate) static TOTAL_HITS: AtomicU32 = AtomicU32::new(0);
 pub(crate) static TOTAL_EVENTS: AtomicU32 = AtomicU32::new(0);

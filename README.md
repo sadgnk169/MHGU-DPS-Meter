@@ -46,6 +46,12 @@ DPS 统计可能让部分玩家感到压力或不适。联机时请尊重队友�
 - 默认行标签为 `You / P1 / P2 / P3 / P4`；
 - 行按伤害从高到低排列；
 - 换区会保留 DPS 累计，结算或保存画面出现约 60 帧（视帧率约 1–2 秒）后自动清零；
+- **任务结束时冻结**：通关、失败或时间到后，用时、伤害、命中、DPS 和曲线整体停在结束瞬间，
+  结算画面出现后才清零；
+- **计时起点可选**：默认从任务开始计时（`dps_timer_from_quest_start = true`），
+  面板一进任务就显示，用时与游戏右上角任务倒计时一致（含接任务后的赶路时间）；
+  在设置页取消 `Start timer at quest start`（或 Purple-lib 第 3 页把“计时起点”设为“首次命中”）
+  则改为第一次命中后计时，DPS 按命中后的时间计算，且**游戏暂停时计时一起暂停、恢复后继续**；
 - 单人任务也会显示；两名及以上玩家时显示底部全队统计；
 - 关闭统计：在 Forge 菜单取消 `Enable DPS meter`，或把 INI 的 `enabled` 改为 `false`；
 - 重置本轮数据：使用 Forge 菜单中的 `Reset DPS`。
@@ -53,7 +59,7 @@ DPS 统计可能让部分玩家感到压力或不适。联机时请尊重队友�
 
 ### Purple-lib（可选）
 
-1.3.0 起支持 [Purple-lib](https://gamebanana.com/mods/740376)：安装 Purple-lib 后，游戏开始菜单的 **Options > Mod Options** 里会出现 `MHGU DPS Meter` 页，可以直接调整 20 项常用设置（显示项、武器图标、玩家名字、图表、百分比条、面板位置、面板大小、背景开关、重置 DPS、恢复默认设置），每一行都有底部说明，改动即时生效，关闭窗口后自动写回 `mhgu_dps_meter.ini`。
+1.3.0 起支持 [Purple-lib](https://gamebanana.com/mods/740376)：安装 Purple-lib 后，游戏开始菜单的 **Options > Mod Options** 里会出现 `MHGU DPS Meter` 页，可以直接调整 21 项常用设置（显示项、武器图标、玩家名字、图表、百分比条、面板位置、面板大小、背景开关、计时起点、重置 DPS、恢复默认设置），每一行都有底部说明，改动即时生效，关闭窗口后自动写回 `mhgu_dps_meter.ini`。
 
 Purple-lib 不是必需的。没有安装时插件行为与之前完全一致，Forge 设置页仍然可用。
 
@@ -84,6 +90,10 @@ dps_scale = 1.0
 
 ; 是否显示面板顶部的 DPS 计时。
 dps_show_timer = true
+
+; 计时起点：true = 从任务开始时计时（默认），与游戏右上角任务倒计时一致，包含赶路时间；
+; false = 第一次命中后开始计时，DPS 按命中后的时间计算。
+dps_timer_from_quest_start = true
 
 ; 是否显示每名玩家的总伤害。
 dps_show_damage = true
@@ -183,6 +193,8 @@ This release has a single NRO, `mhgu_dps_meter.nro`, tested with:
 - Default labels are `You / P1 / P2 / P3 / P4`. 
 - Rows are sorted by damage, highest first.
 - Area changes keep DPS totals;  Data clears about 60 frames (roughly 1–2 seconds depending on frame rate) after the save/result screen appears.
+- **Quest-end freeze**: when the quest ends (clear, fail, or time up), the timer, damage, hits, DPS and chart all stop at the end moment and stay visible until the result screen clears them.
+- **Timer start option**: timing starts at quest start by default (`dps_timer_from_quest_start = true`); the panel appears as soon as you enter the quest and matches the in-game quest countdown (including travel time). Turn off `Start timer at quest start` (or set Purple-lib's "Timer start" row to "First hit") to time from the first hit instead; DPS is then computed from the first-hit time and the timer also pauses while the game is paused.
 - Single-player quests are supported; the team summary appears with two or more players.
 - To disable the overlay, turn off `Enable DPS meter` or set `enabled = false` in the INI.
 - To reset the current run, use `Reset DPS` in the Forge menu.
@@ -190,7 +202,7 @@ This release has a single NRO, `mhgu_dps_meter.nro`, tested with:
 
 ### Purple-lib (optional)
 
-Version 1.3.0 supports [Purple-lib](https://gamebanana.com/mods/740376). With Purple-lib installed, **Options > Mod Options** in the game's start menu gains an `MHGU DPS Meter` page with 20 common settings (display toggles, weapon icons, player names, chart, percent bar, panel position, overlay size, background toggle, Reset DPS, Reset settings). Every row has a help-bar line, changes apply immediately, and closing the window saves them to `mhgu_dps_meter.ini`.
+Version 1.3.0 supports [Purple-lib](https://gamebanana.com/mods/740376). With Purple-lib installed, **Options > Mod Options** in the game's start menu gains an `MHGU DPS Meter` page with 21 common settings (display toggles, weapon icons, player names, chart, percent bar, panel position, overlay size, background toggle, timer start, Reset DPS, Reset settings). Every row has a help-bar line, changes apply immediately, and closing the window saves them to `mhgu_dps_meter.ini`.
 
 Purple-lib is not required. Without it the plugin behaves exactly as before and the Forge settings page still works.
 
@@ -208,6 +220,7 @@ After editing the INI manually, fully restart the game. Menu changes preview imm
 | `dps_background_alpha` | `180.0` | Background opacity, 0–255 |
 | `dps_scale` | `1.0` | Panel size multiplier, 0.5–3.0; position unchanged |
 | `dps_show_timer` | `true` | Show elapsed timer |
+| `dps_timer_from_quest_start` | `true` | `true`: time from quest start (matches in-game countdown); `false`: from first hit |
 | `dps_show_damage` | `true` | Show total damage |
 | `dps_show_percent` | `true` | Show percentage |
 | `dps_show_dps` | `true` | Show DPS |
